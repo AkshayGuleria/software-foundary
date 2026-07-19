@@ -25,12 +25,15 @@ class Store:
         self._sessionmaker = sessionmaker
         self._queue: asyncio.Queue = asyncio.Queue()
         self._writer_task: asyncio.Task | None = None
+        self._running: bool = False
 
     async def start(self) -> None:
         self._writer_task = asyncio.create_task(self._writer_loop())
+        self._running = True
 
     async def stop(self) -> None:
         if self._writer_task is not None:
+            self._running = False
             await self._queue.put((None, None))
             await self._writer_task
 
@@ -48,6 +51,8 @@ class Store:
                 fut.set_exception(exc)
 
     async def write(self, fn: Callable[[Any], Awaitable[Any]]) -> Any:
+        if not self._running:
+            raise RuntimeError("Store is not running — call start() first")
         fut = asyncio.get_event_loop().create_future()
         await self._queue.put((fn, fut))
         return await fut
@@ -208,6 +213,12 @@ class Store:
                 setattr(row, key, value)
 
         await self.write(_op)
+
+    async def get_session_row(self, session_id: str) -> SessionRow | None:
+        async def _op(session):
+            return await session.get(SessionRow, session_id)
+
+        return await self.read(_op)
 
     # --- events ---
 

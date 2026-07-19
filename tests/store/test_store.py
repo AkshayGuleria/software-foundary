@@ -71,3 +71,66 @@ async def test_complete_human_task_closes_unit(tmp_path):
     assert unit.status == "closed"
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_write_before_start_or_after_stop_raises(tmp_path):
+    engine = make_engine(str(tmp_path / "foundry.db"))
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+
+    with pytest.raises(RuntimeError):
+        await store.create_project("never-started", "/tmp/never-started")
+
+    await store.start()
+    await store.create_project("started", "/tmp/started")
+    await store.stop()
+
+    with pytest.raises(RuntimeError):
+        await store.create_project("after-stop", "/tmp/after-stop")
+
+
+@pytest.mark.asyncio
+async def test_artifact_gate_and_session_row_lifecycle(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("demo4", "/tmp/demo4")
+    run = await store.create_run(project.id, "pb.toml", "demo run 4")
+    units = await store.create_work_units([
+        WorkUnit(run_id=run.id, step_id="write_doc", type="task", status="open"),
+    ])
+    unit = units[0]
+
+    artifact = await store.create_artifact(
+        run_id=run.id,
+        work_unit_id=unit.id,
+        kind="doc",
+        produced_by_role="writer",
+        payload_json={"text": "hello"},
+    )
+    artifacts = await store.list_artifacts(run.id)
+    assert [a.id for a in artifacts] == [artifact.id]
+
+    gate = await store.create_gate(
+        work_unit_id=unit.id,
+        artifact_id=artifact.id,
+        gate_type="human",
+    )
+    await store.decide_gate(gate.id, "approved", feedback={"note": "looks good"}, decided_by="alice")
+
+    gates = await store.list_gates_for_run(run.id)
+    assert len(gates) == 1
+    decided_gate = gates[0]
+    assert decided_gate.id == gate.id
+    assert decided_gate.decision == "approved"
+    assert decided_gate.decided_by == "alice"
+    assert decided_gate.decided_at is not None
+    assert decided_gate.feedback_json == {"note": "looks good"}
+
+    session_row = await store.create_session_row(work_unit_id=unit.id, driver="claude-code")
+    await store.update_session_row(session_row.id, status="running", pid=1234)
+
+    fetched = await store.get_session_row(session_row.id)
+    assert fetched.status == "running"
+    assert fetched.pid == 1234
+
+    await store.stop()
