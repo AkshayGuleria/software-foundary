@@ -1,6 +1,6 @@
 import pytest
 
-from foundry.drivers.base import SessionSpec
+from foundry.drivers.base import SessionHandle, SessionSpec
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 
 
@@ -53,3 +53,21 @@ def test_adopt_returns_all_known_handles_health_reflects_state():
 
     driver.cancel(handle)
     assert driver.health(handle).alive is False
+
+
+def test_adopt_excludes_cancelled_handles():
+    driver = FakeDriver()
+    handle = driver.spawn(spec("u5", "a"))
+
+    driver.cancel(handle)
+
+    assert driver.adopt() == []
+
+
+@pytest.mark.asyncio
+async def test_stream_events_on_unknown_handle_raises_value_error():
+    driver = FakeDriver()
+    handle = SessionHandle(id="never-spawned", pid=None)
+
+    with pytest.raises(ValueError):
+        [ev async for ev in driver.stream_events(handle)]

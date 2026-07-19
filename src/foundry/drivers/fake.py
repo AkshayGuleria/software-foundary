@@ -29,6 +29,8 @@ class FakeDriver:
         return handle
 
     async def stream_events(self, handle: SessionHandle) -> AsyncIterator[DriverEvent]:
+        if handle.id not in self._known:
+            raise ValueError(f"unknown session handle: {handle.id}")
         step_script = self.script.get(self._handle_step.get(handle.id, ""), FakeStepScript())
         yield DriverEvent(kind="tool_call", payload={"tool": "noop"})
 
@@ -46,7 +48,7 @@ class FakeDriver:
         self._cancelled.add(handle.id)
 
     def adopt(self) -> list[SessionHandle]:
-        return list(self._known.values())
+        return [h for h in self._known.values() if h.id not in self._cancelled]
 
     def health(self, handle: SessionHandle) -> SessionHealth:
         alive = handle.id in self._known and handle.id not in self._cancelled
