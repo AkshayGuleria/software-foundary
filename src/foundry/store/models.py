@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Optional
 
-from sqlalchemy import ForeignKey, JSON, Integer, String, DateTime
+from sqlalchemy import ForeignKey, JSON, Integer, String, DateTime, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from ulid import ULID
 
@@ -16,6 +16,21 @@ def utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
+class UTCDateTime(TypeDecorator):
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=dt.timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=dt.timezone.utc)
+        return value
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -26,7 +41,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String, unique=True)
     path: Mapped[str] = mapped_column(String)
     kg_status: Mapped[str] = mapped_column(String, default="none")
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Pack(Base):
@@ -34,7 +49,7 @@ class Pack(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String, unique=True)
     manifest_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Run(Base):
@@ -48,8 +63,8 @@ class Run(Base):
     created_by: Mapped[str] = mapped_column(String, default="cli")
     token_budget: Mapped[int] = mapped_column(Integer, default=0)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    closed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    closed_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
 class WorkUnit(Base):
@@ -65,8 +80,8 @@ class WorkUnit(Base):
     owner_session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     convoy_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     assignee: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
 class UnitDep(Base):
@@ -85,7 +100,7 @@ class Artifact(Base):
     produced_by_role: Mapped[str] = mapped_column(String)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     schema_ref: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Gate(Base):
@@ -97,7 +112,7 @@ class Gate(Base):
     decision: Mapped[str] = mapped_column(String, default="pending")  # pending|approved|rejected
     feedback_json: Mapped[dict] = mapped_column(JSON, default=dict)
     decided_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    decided_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
 class SessionRow(Base):
@@ -109,8 +124,8 @@ class SessionRow(Base):
     pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="intent")
-    started_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    ended_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
+    ended_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -122,7 +137,7 @@ class Event(Base):
     unit_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(String)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Memory(Base):
@@ -135,4 +150,4 @@ class Memory(Base):
     body_md: Mapped[str] = mapped_column(String)
     source_run_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     embedding: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)

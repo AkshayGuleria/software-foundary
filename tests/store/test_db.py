@@ -21,3 +21,4 @@ async def test_init_db_creates_tables_and_roundtrips_a_row(tmp_path):
         project = result.scalar_one()
         assert project.path == "/tmp/demo"
         assert len(project.id) == 26  # ULID length
+        assert project.created_at.tzinfo is not None  # tz-aware round-trip
