@@ -52,6 +52,11 @@ async def decide_gate(gate_id: str, body: GateDecideIn, request: Request) -> Api
         raise NotFoundError(f"Gate {gate_id} not found")
     if gate.decision != "pending":
         raise ConflictError(f"Gate {gate_id} was already {gate.decision}")
+    if body.decision == "rejected" and gate.gate_type == "derived":
+        raise ValidationApiError(
+            "rejecting a derived plan-approval gate is not yet supported — "
+            "approve it, or cancel the run and start a new one with a revised plan"
+        )
 
     feedback = (
         {"chips": body.feedback_chips, "text": body.feedback_text} if body.decision == "rejected" else None

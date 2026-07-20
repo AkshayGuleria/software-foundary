@@ -117,6 +117,16 @@ async def _serve(db: str, host: str, port: int) -> None:
     await store.start()
 
     scheduler = Scheduler(store)
+
+    active_runs = await store.list_runs(status="active")
+    for active_run in active_runs:
+        try:
+            playbook = load_playbook(active_run.playbook_ref)
+        except (PlaybookLoadError, PlaybookLintError):
+            continue  # playbook file moved/changed since the run started; skip, don't crash startup
+        script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
+        scheduler.register(active_run.id, FakeDriver(script), playbook)
+
     await scheduler.start()
 
     api_app = create_app(store, scheduler)

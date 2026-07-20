@@ -83,6 +83,30 @@ async def test_decide_already_decided_gate_returns_409(api_client):
 
 
 @pytest.mark.asyncio
+async def test_decide_rejects_rejection_of_a_derived_gate(api_client):
+    client, store, scheduler = api_client
+    _project_id, run_id = await _create_run(client, "tests/playbook/fixtures/sdlc_mini.toml")
+
+    for _ in range(10):
+        await scheduler.tick_all_once()
+        gates = await store.list_gates_for_run(run_id)
+        for g in [g for g in gates if g.decision == "pending" and g.gate_type == "human"]:
+            await store.decide_gate(g.id, "approved", decided_by="test")
+
+    gates = await store.list_gates_for_run(run_id)
+    derived = next(g for g in gates if g.gate_type == "derived" and g.decision == "pending")
+
+    resp = await client.post(f"/api/gates/{derived.id}/decide", json={"decision": "rejected"})
+
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    # confirm it's still pending, not silently half-processed
+    still_pending = await store.read(lambda s: s.get(type(derived), derived.id))
+    assert still_pending.decision == "pending"
+
+
+@pytest.mark.asyncio
 async def test_decide_rejects_invalid_decision_value(api_client):
     client, store, scheduler = api_client
     _project_id, run_id = await _create_run(client, "tests/orchestrator/fixtures/gated_demo.toml")
