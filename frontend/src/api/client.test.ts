@@ -75,4 +75,16 @@ describe("apiFetch", () => {
       body: JSON.stringify({ name: "acme", path: "/tmp/acme" }),
     });
   });
+
+  it("resolves cleanly on a 204 No Content response instead of crashing on empty body", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new SyntaxError("Unexpected end of JSON input");
+      },
+    });
+
+    await expect(apiFetch("/api/runs/01JR1/cancel", { method: "POST" })).resolves.not.toThrow();
+  });
 });

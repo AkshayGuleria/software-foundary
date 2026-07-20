@@ -16,6 +16,14 @@ export class ApiClientError extends Error {
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   const response = await fetch(path, init);
+
+  if (response.status === 204) {
+    if (!response.ok) {
+      throw new ApiClientError("INTERNAL_ERROR", "Request failed with no error body", response.status, null);
+    }
+    return { data: undefined as T, paging: {} as ApiResponse<T>["paging"] };
+  }
+
   const body = await response.json();
 
   if (!response.ok) {
