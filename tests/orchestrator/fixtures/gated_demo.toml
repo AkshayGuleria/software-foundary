@@ -1,0 +1,16 @@
+[playbook]
+id = "gated_demo"
+description = "2-step demo where step A is gated on human approval: a -> b"
+
+[[step]]
+id = "a"
+role = "planner"
+produces = "a_artifact"
+gate = "human"
+
+[[step]]
+id = "b"
+role = "developer"
+needs = ["a"]
+produces = "b_artifact"
+gate = "none"

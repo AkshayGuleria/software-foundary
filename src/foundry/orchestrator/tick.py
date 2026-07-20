@@ -13,6 +13,7 @@ class TickResult:
     dispatched: int
     closed: int
     failed: int
+    complete: bool = True
 
 
 class Orchestrator:
@@ -43,6 +44,10 @@ class Orchestrator:
             pending = [u for u in units if u.status not in ("closed", "failed", "blocked")]
             if not pending:
                 break
+
+        units = await self.store.list_units(run_id)
+        pending = [u for u in units if u.status not in ("closed", "failed", "blocked")]
+        result.complete = not pending
         return result
 
     async def reconcile(self, run_id: str) -> None:
@@ -70,6 +75,61 @@ class Orchestrator:
                     owner_task.id, status="ready", attempt=next_attempt, owner_session_id=None
                 )
                 await self.store.append_event(run_id, owner_task.id, "unit.retried", {"attempt": next_attempt})
+
+        # Second pass: recover tasks orphaned in the crash window between a session
+        # reaching a terminal status (closed/failed) and the owning task being
+        # finalized (artifact creation + task close/block). Re-fetch units since the
+        # first pass above may have changed state.
+        units = await self.store.list_units(run_id)
+        for unit in units:
+            if unit.type != "task" or unit.status != "in_progress":
+                continue
+            session_unit = next((u for u in units if u.id == unit.owner_session_id), None)
+            if session_unit is None or session_unit.status not in ("closed", "failed"):
+                continue
+
+            step = self._steps_by_id[unit.step_id]
+            artifacts = await self.store.list_artifacts(run_id)
+            existing = next((a for a in artifacts if a.work_unit_id == unit.id), None)
+
+            if existing is not None:
+                if step.gate in (None, "none"):
+                    await self.store.update_unit(unit.id, status="closed")
+                    await self.store.append_event(run_id, unit.id, "unit.closed", {"recovered": True})
+                else:
+                    gates = await self.store.list_gates_for_run(run_id)
+                    existing_gate = next((g for g in gates if g.work_unit_id == unit.id), None)
+                    gate_id: str | None = None
+                    if existing_gate is None:
+                        gate = await self.store.create_gate(
+                            work_unit_id=unit.id, artifact_id=existing.id, gate_type=step.gate, decision="pending",
+                        )
+                        gate_id = gate.id
+                    else:
+                        gate = existing_gate
+                    if gate.decision == "pending":
+                        await self.store.decide_gate(gate.id, "approved", decided_by="system-auto-m0")
+                    await self.store.update_unit(unit.id, status="blocked")
+                    payload = {"recovered": True}
+                    if gate_id is not None:
+                        payload["gate_id"] = gate_id
+                    await self.store.append_event(run_id, unit.id, "gate.created", payload)
+            else:
+                next_attempt = unit.attempt + 1
+                if next_attempt >= unit.max_attempts:
+                    await self.store.update_unit(unit.id, status="blocked", attempt=next_attempt)
+                    await self.store.create_gate(work_unit_id=unit.id, gate_type="human", decision="pending")
+                    await self.store.append_event(
+                        run_id, unit.id, "unit.blocked", {"reason": "orphaned_after_session_finalized"}
+                    )
+                else:
+                    await self.store.update_unit(
+                        unit.id, status="ready", attempt=next_attempt, owner_session_id=None
+                    )
+                    await self.store.append_event(
+                        run_id, unit.id, "unit.retried",
+                        {"attempt": next_attempt, "reason": "orphaned_after_session_finalized"},
+                    )
 
     async def apply_gate_decisions(self, run_id: str) -> None:
         units = {u.id: u for u in await self.store.list_units(run_id)}
@@ -181,5 +241,10 @@ class Orchestrator:
             gate = await self.store.create_gate(
                 work_unit_id=task_unit.id, artifact_id=artifact.id, gate_type=step.gate, decision="pending",
             )
+            # M0 has no human/agent approval UI yet; auto-approve gates produced by a
+            # successful step so the task closes on the next tick. Gates created by the
+            # max-attempts failure-escalation path are NOT touched here — those must
+            # stay pending for an actual human to look at.
+            await self.store.decide_gate(gate.id, "approved", decided_by="system-auto-m0")
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})

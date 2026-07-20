@@ -1,0 +1,9 @@
+[playbook]
+id = "stuck_human_task"
+description = "single human_task step with no needs; dispatch() never processes human_task units in M0, so it stays ready forever"
+
+[[step]]
+id = "review_by_human"
+role = "human"
+type = "human_task"
+produces = "human_review_artifact"

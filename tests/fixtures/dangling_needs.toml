@@ -1,0 +1,9 @@
+[playbook]
+id = "dangling_needs"
+description = "invalid playbook: step references a needs id that does not exist"
+
+[[step]]
+id = "a"
+role = "planner"
+produces = "a_artifact"
+needs = ["does_not_exist"]
