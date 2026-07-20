@@ -1,0 +1,23 @@
+[playbook]
+id = "linear_demo"
+description = "3-step linear demo: plan -> implement -> review"
+
+[[step]]
+id = "plan"
+role = "planner"
+produces = "plan_artifact"
+gate = "none"
+
+[[step]]
+id = "implement"
+role = "developer"
+needs = ["plan"]
+produces = "code_diff_artifact"
+gate = "none"
+
+[[step]]
+id = "review"
+role = "reviewer"
+needs = ["implement"]
+produces = "review_artifact"
+gate = "none"

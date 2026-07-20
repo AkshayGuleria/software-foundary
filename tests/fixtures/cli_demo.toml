@@ -1,0 +1,9 @@
+[playbook]
+id = "cli_demo"
+description = "single-step smoke test playbook"
+
+[[step]]
+id = "plan"
+role = "planner"
+produces = "plan_artifact"
+gate = "none"

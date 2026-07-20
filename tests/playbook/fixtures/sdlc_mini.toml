@@ -1,0 +1,38 @@
+[playbook]
+id = "sdlc_mini"
+description = "requirement -> (architecture, test_plan) -> plan_approval -> implement"
+
+[[step]]
+id = "requirement"
+role = "product_owner"
+produces = "requirement_artifact"
+gate = "human"
+
+[[step]]
+id = "architecture"
+role = "architect"
+needs = ["requirement"]
+produces = "architecture_artifact"
+gate = "human"
+
+[[step]]
+id = "test_plan"
+role = "qa"
+needs = ["requirement"]
+produces = "test_plan_artifact"
+gate = "human"
+
+[[step]]
+id = "plan_approval"
+role = "system"
+type = "derived_gate"
+needs = ["requirement", "architecture", "test_plan"]
+
+[[step]]
+id = "implement"
+role = "developer"
+type = "task"
+needs = ["plan_approval"]
+produces = "code_diff_artifact"
+gate = "human"
+writes = true
