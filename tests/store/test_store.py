@@ -140,3 +140,86 @@ async def test_artifact_gate_and_session_row_lifecycle(tmp_path):
     assert fetched.pid == 1234
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_list_projects_and_get_project(tmp_path):
+    store = await make_store(tmp_path)
+    p1 = await store.create_project("proj-a", "/tmp/a")
+    p2 = await store.create_project("proj-b", "/tmp/b")
+
+    all_projects = await store.list_projects()
+    assert {p.id for p in all_projects} == {p1.id, p2.id}
+
+    fetched = await store.get_project(p1.id)
+    assert fetched.name == "proj-a"
+    assert await store.get_project("does-not-exist") is None
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_get_run_and_list_runs_with_filters(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("proj", "/tmp/proj")
+    run1 = await store.create_run(project.id, "pb1.toml", "run one")
+    run2 = await store.create_run(project.id, "pb2.toml", "run two")
+    await store.update_run(run2.id, status="closed")
+
+    assert (await store.get_run(run1.id)).title == "run one"
+    assert await store.get_run("does-not-exist") is None
+
+    all_runs = await store.list_runs(project_id=project.id)
+    assert {r.id for r in all_runs} == {run1.id, run2.id}
+
+    active_only = await store.list_runs(project_id=project.id, status="active")
+    assert [r.id for r in active_only] == [run1.id]
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_get_next_artifact_version_increments_per_work_unit(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("proj2", "/tmp/proj2")
+    run = await store.create_run(project.id, "pb.toml", "run")
+    units = await store.create_work_units([WorkUnit(run_id=run.id, step_id="a", type="task", status="open")])
+    unit = units[0]
+
+    assert await store.get_next_artifact_version(unit.id) == 1
+
+    await store.create_artifact(
+        run_id=run.id,
+        work_unit_id=unit.id,
+        kind="a_artifact",
+        version=1,
+        produced_by_role="planner",
+        payload_json={},
+    )
+    assert await store.get_next_artifact_version(unit.id) == 2
+
+    await store.create_artifact(
+        run_id=run.id,
+        work_unit_id=unit.id,
+        kind="a_artifact",
+        version=2,
+        produced_by_role="planner",
+        payload_json={},
+    )
+    assert await store.get_next_artifact_version(unit.id) == 3
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_append_event_redacts_payload_before_persisting(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("proj3", "/tmp/proj3")
+    run = await store.create_run(project.id, "pb.toml", "run")
+
+    seq = await store.append_event(run.id, None, "test.event", {"secret_token": "shh", "ok": True})
+    events = await store.list_events(run.id, after_seq=seq - 1)
+    assert events[0].payload_json["secret_token"] == "***REDACTED***"
+    assert events[0].payload_json["ok"] is True
+
+    await store.stop()

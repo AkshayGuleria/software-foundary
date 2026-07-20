@@ -18,6 +18,7 @@ from foundry.store.models import (
     WorkUnit,
     utcnow,
 )
+from foundry.store.redaction import redact_event_payload
 
 
 class Store:
@@ -73,6 +74,19 @@ class Store:
 
         return await self.write(_op)
 
+    async def list_projects(self) -> list[Project]:
+        async def _op(session):
+            res = await session.execute(select(Project))
+            return list(res.scalars())
+
+        return await self.read(_op)
+
+    async def get_project(self, project_id: str) -> Project | None:
+        async def _op(session):
+            return await session.get(Project, project_id)
+
+        return await self.read(_op)
+
     async def create_run(self, project_id: str, playbook_ref: str, title: str) -> Run:
         async def _op(session):
             run = Run(project_id=project_id, playbook_ref=playbook_ref, title=title)
@@ -81,6 +95,32 @@ class Store:
             return run
 
         return await self.write(_op)
+
+    async def get_run(self, run_id: str) -> Run | None:
+        async def _op(session):
+            return await session.get(Run, run_id)
+
+        return await self.read(_op)
+
+    async def list_runs(self, project_id: str | None = None, status: str | None = None) -> list[Run]:
+        async def _op(session):
+            stmt = select(Run)
+            if project_id is not None:
+                stmt = stmt.where(Run.project_id == project_id)
+            if status is not None:
+                stmt = stmt.where(Run.status == status)
+            res = await session.execute(stmt)
+            return list(res.scalars())
+
+        return await self.read(_op)
+
+    async def update_run(self, run_id: str, **fields) -> None:
+        async def _op(session):
+            run = await session.get(Run, run_id)
+            for key, value in fields.items():
+                setattr(run, key, value)
+
+        await self.write(_op)
 
     # --- work units / deps ---
 
@@ -168,6 +208,18 @@ class Store:
 
         return await self.read(_op)
 
+    async def get_next_artifact_version(self, work_unit_id: str) -> int:
+        async def _op(session):
+            res = await session.execute(
+                select(Artifact.version)
+                .where(Artifact.work_unit_id == work_unit_id)
+                .order_by(Artifact.version.desc())
+            )
+            latest = res.scalars().first()
+            return (latest or 0) + 1
+
+        return await self.read(_op)
+
     async def create_gate(self, **fields) -> Gate:
         async def _op(session):
             gate = Gate(**fields)
@@ -229,7 +281,8 @@ class Store:
         self, run_id: str, unit_id: str | None, type_: str, payload: dict | None = None
     ) -> int:
         async def _op(session):
-            ev = Event(run_id=run_id, unit_id=unit_id, type=type_, payload_json=payload or {})
+            redacted_payload = redact_event_payload(payload or {})
+            ev = Event(run_id=run_id, unit_id=unit_id, type=type_, payload_json=redacted_payload)
             session.add(ev)
             await session.flush()
             return ev.seq
