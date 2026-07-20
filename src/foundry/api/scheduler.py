@@ -25,7 +25,12 @@ class Scheduler:
 
     async def tick_all_once(self) -> None:
         for run_id, orchestrator in list(self._orchestrators.items()):
-            await orchestrator.tick(run_id)
+            try:
+                await orchestrator.tick(run_id)
+            except Exception as exc:  # noqa: BLE001 - isolate one run's failure from the rest
+                await self.store.append_event(run_id, None, "run.tick_error", {"error": str(exc)})
+                continue
+
             if await self._is_finished(run_id):
                 await self.store.update_run(run_id, status="closed", closed_at=utcnow())
                 self.unregister(run_id)
