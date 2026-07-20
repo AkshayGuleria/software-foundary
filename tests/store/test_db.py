@@ -17,6 +17,7 @@ async def test_init_db_creates_tables_and_roundtrips_a_row(tmp_path):
 
     async with sessionmaker() as session:
         from sqlalchemy import select
+
         result = await session.execute(select(Project).where(Project.name == "demo"))
         project = result.scalar_one()
         assert project.path == "/tmp/demo"

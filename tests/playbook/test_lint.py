@@ -1,7 +1,7 @@
 import pytest
 
-from foundry.playbook.loader import load_playbook
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
+from foundry.playbook.loader import load_playbook
 from foundry.playbook.schema import PlaybookSpec, StepSpec
 
 

@@ -20,8 +20,7 @@ def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db") -> 
     run_id, complete, pending_count = asyncio.run(_run(playbook_path, project_path, db))
     if not complete:
         typer.echo(
-            f"run {run_id} did not complete: {pending_count} unit(s) still pending "
-            "(check gates/human_tasks)",
+            f"run {run_id} did not complete: {pending_count} unit(s) still pending (check gates/human_tasks)",
             err=True,
         )
         raise typer.Exit(1)
@@ -40,7 +39,7 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
     except (PlaybookLoadError, PlaybookLintError) as e:
         await store.stop()
         typer.echo(str(e), err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     project = await store.create_project(playbook.id, project_path)
     run_row = await store.create_run(project.id, playbook_path, playbook.description or playbook.id)

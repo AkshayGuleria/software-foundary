@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Optional
 
-from sqlalchemy import ForeignKey, JSON, Integer, String, DateTime, TypeDecorator
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from ulid import ULID
 
@@ -13,7 +12,7 @@ def new_id() -> str:
 
 
 def utcnow() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 class UTCDateTime(TypeDecorator):
@@ -22,12 +21,12 @@ class UTCDateTime(TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=dt.timezone.utc)
+            value = value.replace(tzinfo=dt.UTC)
         return value
 
     def process_result_value(self, value, dialect):
         if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=dt.timezone.utc)
+            value = value.replace(tzinfo=dt.UTC)
         return value
 
 
@@ -64,7 +63,7 @@ class Run(Base):
     token_budget: Mapped[int] = mapped_column(Integer, default=0)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
-    closed_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
+    closed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class WorkUnit(Base):
@@ -77,9 +76,9 @@ class WorkUnit(Base):
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     attempt: Mapped[int] = mapped_column(Integer, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, default=3)
-    owner_session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    convoy_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    assignee: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    owner_session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    convoy_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    assignee: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
@@ -99,7 +98,7 @@ class Artifact(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
     produced_by_role: Mapped[str] = mapped_column(String)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    schema_ref: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    schema_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -107,12 +106,12 @@ class Gate(Base):
     __tablename__ = "gates"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     work_unit_id: Mapped[str] = mapped_column(String, ForeignKey("work_units.id"))
-    artifact_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("artifacts.id"), nullable=True)
+    artifact_id: Mapped[str | None] = mapped_column(String, ForeignKey("artifacts.id"), nullable=True)
     gate_type: Mapped[str] = mapped_column(String)  # human|agent|derived
     decision: Mapped[str] = mapped_column(String, default="pending")  # pending|approved|rejected
     feedback_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    decided_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    decided_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    decided_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class SessionRow(Base):
@@ -120,12 +119,12 @@ class SessionRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     work_unit_id: Mapped[str] = mapped_column(String, ForeignKey("work_units.id"))
     driver: Mapped[str] = mapped_column(String)
-    provider_session_ref: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    provider_session_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    pid: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="intent")
-    started_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
-    ended_at: Mapped[Optional[dt.datetime]] = mapped_column(UTCDateTime, nullable=True)
+    started_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    ended_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -134,7 +133,7 @@ class Event(Base):
     __tablename__ = "events"
     seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String, ForeignKey("runs.id"))
-    unit_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    unit_id: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(String)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -143,11 +142,11 @@ class Event(Base):
 class Memory(Base):
     __tablename__ = "memory"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
-    pack_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pack_id: Mapped[str | None] = mapped_column(String, nullable=True)
     scope: Mapped[str] = mapped_column(String)  # pack|project|role
     kind: Mapped[str] = mapped_column(String)  # lesson|pattern|pitfall
     title: Mapped[str] = mapped_column(String)
     body_md: Mapped[str] = mapped_column(String)
-    source_run_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    embedding: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    source_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    embedding: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)

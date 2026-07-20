@@ -6,8 +6,17 @@ from foundry.drivers.fake import FakeDriver, FakeStepScript
 
 def spec(unit_id: str, step_id: str) -> SessionSpec:
     return SessionSpec(
-        cwd=".", prompt="p", model="fake", tool_policy={}, mcp_servers=[], env={},
-        internal_endpoint="", internal_secret="", unit_id=unit_id, run_id="r1", step_id=step_id,
+        cwd=".",
+        prompt="p",
+        model="fake",
+        tool_policy={},
+        mcp_servers=[],
+        env={},
+        internal_endpoint="",
+        internal_secret="",
+        unit_id=unit_id,
+        run_id="r1",
+        step_id=step_id,
     )
 
 

@@ -13,7 +13,7 @@ async def materialize(playbook: PlaybookSpec, run_id: str, store: Store) -> dict
         for step in playbook.steps
     ]
     created = await store.create_work_units(units)
-    step_to_unit = {step.id: unit.id for step, unit in zip(playbook.steps, created)}
+    step_to_unit = {step.id: unit.id for step, unit in zip(playbook.steps, created, strict=True)}
 
     deps = [
         UnitDep(unit_id=step_to_unit[step.id], needs_unit_id=step_to_unit[need_id])

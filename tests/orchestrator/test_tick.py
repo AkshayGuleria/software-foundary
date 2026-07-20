@@ -213,8 +213,12 @@ async def test_reconcile_recovers_orphaned_task_with_existing_artifact_closes_di
     )[0]
     await store.update_unit(implement_task.id, owner_session_id=orphan_session.id, status="in_progress")
     await store.create_artifact(
-        run_id=run.id, work_unit_id=implement_task.id, kind="code_diff_artifact",
-        version=1, produced_by_role="developer", payload_json={"diff": "pre-crash"},
+        run_id=run.id,
+        work_unit_id=implement_task.id,
+        kind="code_diff_artifact",
+        version=1,
+        produced_by_role="developer",
+        payload_json={"diff": "pre-crash"},
     )
 
     fresh_orch = Orchestrator(store, FakeDriver(script), playbook)
@@ -251,14 +255,16 @@ async def test_reconcile_recovers_orphaned_gated_task_with_existing_artifact_aut
     a_task = next(u for u in units if u.step_id == "a" and u.type == "task")
 
     orphan_session = (
-        await store.create_work_units(
-            [WorkUnit(run_id=run.id, step_id="a", type="session", status="closed")]
-        )
+        await store.create_work_units([WorkUnit(run_id=run.id, step_id="a", type="session", status="closed")])
     )[0]
     await store.update_unit(a_task.id, owner_session_id=orphan_session.id, status="in_progress")
     await store.create_artifact(
-        run_id=run.id, work_unit_id=a_task.id, kind="a_artifact",
-        version=1, produced_by_role="planner", payload_json={"ok": True},
+        run_id=run.id,
+        work_unit_id=a_task.id,
+        kind="a_artifact",
+        version=1,
+        produced_by_role="planner",
+        payload_json={"ok": True},
     )
 
     script = {

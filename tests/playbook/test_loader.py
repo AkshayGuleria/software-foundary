@@ -8,7 +8,11 @@ def test_loads_steps_and_needs_edges():
 
     assert playbook.id == "sdlc_mini"
     assert [s.id for s in playbook.steps] == [
-        "requirement", "architecture", "test_plan", "plan_approval", "implement",
+        "requirement",
+        "architecture",
+        "test_plan",
+        "plan_approval",
+        "implement",
     ]
 
     implement = next(s for s in playbook.steps if s.id == "implement")

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
@@ -185,7 +186,9 @@ class Store:
 
         return await self.read(_op)
 
-    async def decide_gate(self, gate_id: str, decision: str, feedback: dict | None = None, decided_by: str = "human") -> None:
+    async def decide_gate(
+        self, gate_id: str, decision: str, feedback: dict | None = None, decided_by: str = "human"
+    ) -> None:
         async def _op(session):
             gate = await session.get(Gate, gate_id)
             gate.decision = decision
@@ -222,7 +225,9 @@ class Store:
 
     # --- events ---
 
-    async def append_event(self, run_id: str, unit_id: str | None, type_: str, payload: dict | None = None) -> int:
+    async def append_event(
+        self, run_id: str, unit_id: str | None, type_: str, payload: dict | None = None
+    ) -> int:
         async def _op(session):
             ev = Event(run_id=run_id, unit_id=unit_id, type=type_, payload_json=payload or {})
             session.add(ev)

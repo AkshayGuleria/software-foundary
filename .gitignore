@@ -8,7 +8,9 @@ __pycache__/
 *.db-wal
 *.db-shm
 worktrees/
-.claude/
+.claude/*
+!.claude/CLAUDE.md
+!.claude/git-workflow.md
 dist/
 build/
 node_modules/

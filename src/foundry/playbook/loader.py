@@ -29,9 +29,7 @@ def _validate_structure(playbook: PlaybookSpec) -> None:
             duplicate_ids.add(step.id)
         seen_ids.add(step.id)
     if duplicate_ids:
-        raise PlaybookLoadError(
-            f"duplicate step id(s) in playbook: {sorted(duplicate_ids)}"
-        )
+        raise PlaybookLoadError(f"duplicate step id(s) in playbook: {sorted(duplicate_ids)}")
 
     valid_ids = seen_ids
     for step in playbook.steps:

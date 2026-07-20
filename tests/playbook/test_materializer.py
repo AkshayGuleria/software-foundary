@@ -34,7 +34,9 @@ async def test_materialize_creates_units_and_dep_edges(tmp_path):
 
     plan_approval_deps = {d.needs_unit_id for d in deps if d.unit_id == step_to_unit["plan_approval"]}
     assert plan_approval_deps == {
-        step_to_unit["requirement"], step_to_unit["architecture"], step_to_unit["test_plan"],
+        step_to_unit["requirement"],
+        step_to_unit["architecture"],
+        step_to_unit["test_plan"],
     }
 
     await store.stop()

@@ -15,9 +15,7 @@ def lint_plan_first(playbook: PlaybookSpec) -> None:
         if step.writes and not _has_upstream_derived_gate(step, steps_by_id, set())
     ]
     if violations:
-        raise PlaybookLintError(
-            f"writes-capable step(s) not downstream of a derived_gate: {violations}"
-        )
+        raise PlaybookLintError(f"writes-capable step(s) not downstream of a derived_gate: {violations}")
 
 
 def _has_upstream_derived_gate(step: StepSpec, steps_by_id: dict[str, StepSpec], seen: set[str]) -> bool:

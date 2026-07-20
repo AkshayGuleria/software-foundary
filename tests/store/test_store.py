@@ -19,10 +19,12 @@ async def test_ready_units_unblock_after_dependency_closes(tmp_path):
     project = await store.create_project("demo", "/tmp/demo")
     run = await store.create_run(project.id, "pb.toml", "demo run")
 
-    units = await store.create_work_units([
-        WorkUnit(run_id=run.id, step_id="a", type="task", status="open"),
-        WorkUnit(run_id=run.id, step_id="b", type="task", status="open"),
-    ])
+    units = await store.create_work_units(
+        [
+            WorkUnit(run_id=run.id, step_id="a", type="task", status="open"),
+            WorkUnit(run_id=run.id, step_id="b", type="task", status="open"),
+        ]
+    )
     unit_a, unit_b = units
     await store.add_unit_deps([UnitDep(unit_id=unit_b.id, needs_unit_id=unit_a.id)])
 
@@ -61,9 +63,11 @@ async def test_complete_human_task_closes_unit(tmp_path):
     store = await make_store(tmp_path)
     project = await store.create_project("demo3", "/tmp/demo3")
     run = await store.create_run(project.id, "pb.toml", "demo run 3")
-    units = await store.create_work_units([
-        WorkUnit(run_id=run.id, step_id="approve", type="human_task", status="ready"),
-    ])
+    units = await store.create_work_units(
+        [
+            WorkUnit(run_id=run.id, step_id="approve", type="human_task", status="ready"),
+        ]
+    )
 
     await store.complete_human_task(units[0].id)
 
@@ -95,9 +99,11 @@ async def test_artifact_gate_and_session_row_lifecycle(tmp_path):
     store = await make_store(tmp_path)
     project = await store.create_project("demo4", "/tmp/demo4")
     run = await store.create_run(project.id, "pb.toml", "demo run 4")
-    units = await store.create_work_units([
-        WorkUnit(run_id=run.id, step_id="write_doc", type="task", status="open"),
-    ])
+    units = await store.create_work_units(
+        [
+            WorkUnit(run_id=run.id, step_id="write_doc", type="task", status="open"),
+        ]
+    )
     unit = units[0]
 
     artifact = await store.create_artifact(

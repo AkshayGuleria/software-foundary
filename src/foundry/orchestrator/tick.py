@@ -68,13 +68,19 @@ class Orchestrator:
             next_attempt = owner_task.attempt + 1
             if next_attempt >= owner_task.max_attempts:
                 await self.store.update_unit(owner_task.id, status="blocked", attempt=next_attempt)
-                await self.store.create_gate(work_unit_id=owner_task.id, gate_type="human", decision="pending")
-                await self.store.append_event(run_id, owner_task.id, "unit.blocked", {"reason": "max_attempts"})
+                await self.store.create_gate(
+                    work_unit_id=owner_task.id, gate_type="human", decision="pending"
+                )
+                await self.store.append_event(
+                    run_id, owner_task.id, "unit.blocked", {"reason": "max_attempts"}
+                )
             else:
                 await self.store.update_unit(
                     owner_task.id, status="ready", attempt=next_attempt, owner_session_id=None
                 )
-                await self.store.append_event(run_id, owner_task.id, "unit.retried", {"attempt": next_attempt})
+                await self.store.append_event(
+                    run_id, owner_task.id, "unit.retried", {"attempt": next_attempt}
+                )
 
         # Second pass: recover tasks orphaned in the crash window between a session
         # reaching a terminal status (closed/failed) and the owning task being
@@ -102,7 +108,10 @@ class Orchestrator:
                     gate_id: str | None = None
                     if existing_gate is None:
                         gate = await self.store.create_gate(
-                            work_unit_id=unit.id, artifact_id=existing.id, gate_type=step.gate, decision="pending",
+                            work_unit_id=unit.id,
+                            artifact_id=existing.id,
+                            gate_type=step.gate,
+                            decision="pending",
                         )
                         gate_id = gate.id
                     else:
@@ -127,7 +136,9 @@ class Orchestrator:
                         unit.id, status="ready", attempt=next_attempt, owner_session_id=None
                     )
                     await self.store.append_event(
-                        run_id, unit.id, "unit.retried",
+                        run_id,
+                        unit.id,
+                        "unit.retried",
                         {"attempt": next_attempt, "reason": "orphaned_after_session_finalized"},
                     )
 
@@ -179,25 +190,39 @@ class Orchestrator:
             await self.store.append_event(run_id, session_unit.id, "session.intent", {})
 
             spec = SessionSpec(
-                cwd=".", prompt=f"step:{step.id}", model="fake", tool_policy={}, mcp_servers=[],
-                env={}, internal_endpoint="", internal_secret="",
-                unit_id=session_unit.id, run_id=run_id, step_id=step.id,
+                cwd=".",
+                prompt=f"step:{step.id}",
+                model="fake",
+                tool_policy={},
+                mcp_servers=[],
+                env={},
+                internal_endpoint="",
+                internal_secret="",
+                unit_id=session_unit.id,
+                run_id=run_id,
+                step_id=step.id,
             )
             handle = self.driver.spawn(spec)
             await self.store.update_unit(session_unit.id, status="running")
             await self.store.create_session_row(
-                id=session_unit.id, work_unit_id=session_unit.id,
-                driver=type(self.driver).__name__, status="running",
+                id=session_unit.id,
+                work_unit_id=session_unit.id,
+                driver=type(self.driver).__name__,
+                status="running",
             )
             await self.store.update_unit(task_unit.id, status="in_progress")
-            await self.store.append_event(run_id, session_unit.id, "session.spawned", {"handle_id": handle.id})
+            await self.store.append_event(
+                run_id, session_unit.id, "session.spawned", {"handle_id": handle.id}
+            )
             dispatched += 1
 
             await self._collect(run_id, task_unit, session_unit, step, handle)
 
         return dispatched
 
-    async def _collect(self, run_id: str, task_unit: WorkUnit, session_unit: WorkUnit, step: StepSpec, handle) -> None:
+    async def _collect(
+        self, run_id: str, task_unit: WorkUnit, session_unit: WorkUnit, step: StepSpec, handle
+    ) -> None:
         artifact_payload: dict = {}
         failed = False
         error_payload: dict = {}
@@ -229,8 +254,12 @@ class Orchestrator:
             return
 
         artifact = await self.store.create_artifact(
-            run_id=run_id, work_unit_id=task_unit.id, kind=step.produces or "artifact",
-            version=1, produced_by_role=step.role, payload_json=artifact_payload,
+            run_id=run_id,
+            work_unit_id=task_unit.id,
+            kind=step.produces or "artifact",
+            version=1,
+            produced_by_role=step.role,
+            payload_json=artifact_payload,
         )
         await self.store.append_event(run_id, task_unit.id, "artifact.produced", {"artifact_id": artifact.id})
 
@@ -239,7 +268,10 @@ class Orchestrator:
             await self.store.append_event(run_id, task_unit.id, "unit.closed", {})
         else:
             gate = await self.store.create_gate(
-                work_unit_id=task_unit.id, artifact_id=artifact.id, gate_type=step.gate, decision="pending",
+                work_unit_id=task_unit.id,
+                artifact_id=artifact.id,
+                gate_type=step.gate,
+                decision="pending",
             )
             # M0 has no human/agent approval UI yet; auto-approve gates produced by a
             # successful step so the task closes on the next tick. Gates created by the
