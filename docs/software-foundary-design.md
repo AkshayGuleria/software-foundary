@@ -429,6 +429,36 @@ All metrics derive from the event log — no separate instrumentation. A rollup 
 | Context strategy | KG-minimal bundles | Full-repo agent exploration | 5–10× token reduction on implement/review steps; falls back to exploration when the graph has low confidence for a query |
 | Worktrees per unit | Yes | Shared checkout per run | Parallel slices can't trample each other; failed work is discardable. Cost: disk + merge step complexity |
 
+### 13.1 ADR practice — binding on implementation
+
+The trade-offs above are this document's own record of the platform-wide decisions
+made at design time. Decisions made **after** this document — a new constraint
+discovered mid-build, a schema/API/protocol choice a milestone needs that this doc
+left open — are recorded as Architecture Decision Records in `docs/adrs/`, not as
+edits scattered through this file's prose.
+
+**Rules for implementers and plans:**
+
+1. Before writing an implementation plan (`superpowers:writing-plans`) or a task brief
+   for any area with an existing ADR, read `docs/adrs/README.md`'s index first. An
+   Accepted ADR is binding — implement to it, don't re-derive the decision from first
+   principles or from a different convention you're more familiar with.
+2. A plan or task that would contradict an Accepted ADR is a stop-and-ask, the same as
+   any other plan-vs-reality conflict (see `superpowers:subagent-driven-development`'s
+   review-loop rule: a finding that conflicts with a governing document is the human's
+   call, not something to silently override either way).
+3. If an ADR needs to change, write a new one that supersedes it (`Status: Superseded
+   by ADR-XXX`) — never silently edit an Accepted ADR's decision out from under work
+   that already depended on it.
+4. This document stays the source of truth for the *initial* platform-wide trade-offs
+   (§13 above); `docs/adrs/` is the source of truth for everything decided since. Where
+   a later ADR revises something stated in this doc, the ADR wins — this document is
+   not retroactively edited to match (that history is what makes ADRs useful; add a
+   one-line pointer here only if a section would otherwise actively mislead a reader).
+
+Current ADRs and what they bind: see `docs/adrs/README.md`. (As of this writing:
+ADR-001, REST API response structure — binding on the `/api` work in M1, §15.)
+
 ---
 
 ## 14. Risks and open questions
@@ -450,7 +480,7 @@ Store schema (WAL, single-writer task) + event log; playbook parser + DAG materi
 **Exit:** (a) full engine test suite green on FakeDriver, including `kill -9` mid-run → restart → run completes, with zero tokens spent; (b) the same 3-step linear playbook (plan → implement → review) then runs end-to-end on a real repo via ClaudeCodeDriver. No UI, gates auto-approved.
 
 ### M1 — Plan-first + gates + dashboard MVP (3–4 weeks)
-Artifact schemas + validation (incl. `notes_addressed` contract); human gates with reject/rework loop; `human_task` units + My-queue view; plan-first lint; derived plan-approval gate with cost estimate; dashboard: runs home, run detail (ribbon, artifacts/gates panel, SSE feed); cancel propagation; event redaction filter.
+Artifact schemas + validation (incl. `notes_addressed` contract); human gates with reject/rework loop; `human_task` units + My-queue view; plan-first lint; derived plan-approval gate with cost estimate; dashboard: runs home, run detail (ribbon, artifacts/gates panel, SSE feed); cancel propagation; event redaction filter. `/api` responses conform to ADR-001 (`docs/adrs/001-api-response-structure.md`) — envelope, pagination, error shape, status codes — from the first endpoint, not retrofitted after the dashboard is built against something ad hoc.
 **Exit:** full plan → approve → implement → reject → rework → approve cycle driven entirely from the browser, with **two registered projects running concurrently** (project registration + project-scoped runs land here; the data model is project-namespaced from M0). *This is the first daily-drivable version.*
 
 ### M2 — Fan-out + review loop + second provider (3 weeks)

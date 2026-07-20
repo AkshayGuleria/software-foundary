@@ -7,6 +7,11 @@ model, store choice, playbook format, gate policy, KG, worktrees) are already re
 in `docs/software-foundary-design.md` §13 ("Trade-off analysis") — don't duplicate
 those here; only add an ADR when a *new* decision is made or an existing one is revised.
 
+**Accepted ADRs here are binding on implementation** — see design doc §13.1 ("ADR
+practice") for the rule: read this index before planning/implementing anything an
+existing ADR already covers, and treat a plan that would contradict one the same as
+any other plan-vs-reality conflict (stop and ask, don't silently override).
+
 ## ADR format
 
 ```markdown
