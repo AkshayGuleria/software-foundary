@@ -423,7 +423,7 @@
     <div class="meta-line">
       <span><strong>Repo:</strong> software-foundary</span>
       <span><strong>Design doc:</strong> v1, 2026-07-12</span>
-      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-20</span>
+      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-21</span>
     </div>
   </header>
 
@@ -480,7 +480,7 @@
   const DATA = {
     stats: [
       { label: "Milestones shipped", value: "1 / 6", accent: false },
-      { label: "Tests passing", value: "28 / 28", done: true },
+      { label: "Tests passing", value: "72 / 72", done: true },
       { label: "Requirements met", value: "3 / 11", accent: false },
       { label: "ADRs accepted", value: "1", accent: false },
     ],
@@ -494,11 +494,11 @@
         ],
       },
       {
-        id: "M1", name: "Plan-first + gates + dashboard MVP", duration: "3–4 weeks", status: "planned",
-        scope: "Artifact schemas + validation (<code>notes_addressed</code> contract); human gates with reject/rework loop; <code>human_task</code> units + My‑queue view; derived plan‑approval gate with cost estimate; dashboard (runs home, run detail, SSE feed); cancel propagation; event redaction. <code>/api</code> conforms to ADR‑001.",
+        id: "M1", name: "Plan-first + gates + dashboard MVP", duration: "3–4 weeks", status: "active",
+        scope: "<strong>M1a (backend, shipped):</strong> real API‑driven gates (no more auto‑approve) with reject/rework loop and artifact versioning; derived plan‑approval gate with cost estimate; FastAPI <code>/api</code> — projects, runs, gates, cancel, SSE stream, all conforming to ADR‑001; background scheduler; <code>foundry serve</code>. <strong>M1b (dashboard, not started):</strong> React/Vite/TS/Tailwind UI, <code>human_task</code> My‑queue view, event redaction glob config, <code>notes_addressed</code> chat contract.",
         criteria: [
-          { met: false, text: "Full plan → approve → implement → reject → rework → approve cycle driven entirely from the browser" },
-          { met: false, text: "Two registered projects running concurrently — first daily‑drivable version" },
+          { met: true, text: "Full plan → approve → implement → reject → rework → approve cycle — proven end‑to‑end over the HTTP API (M1a); 'driven entirely from the browser' still needs M1b's dashboard" },
+          { met: false, text: "Two registered projects running concurrently — first daily‑drivable version (needs the dashboard, M1b)" },
         ],
       },
       {
@@ -533,25 +533,28 @@
       },
     ],
     requirements: [
-      { id: "F1", name: "Plan-first runs", status: "partial", milestone: "M0 → M1" },
-      { id: "F2", name: "Artifact gates everywhere", status: "partial", milestone: "M0 → M1" },
+      { id: "F1", name: "Plan-first runs", status: "partial", milestone: "M0/M1a → M1b" },
+      { id: "F2", name: "Artifact gates everywhere", status: "partial", milestone: "M0/M1a → M1b" },
       { id: "F3", name: "Declarative playbooks", status: "done", milestone: "M0" },
       { id: "F4", name: "Parallel fan-out", status: "planned", milestone: "M2" },
       { id: "F5", name: "Provider-agnostic agents", status: "partial", milestone: "M0 → M2" },
       { id: "F6", name: "Durable work + crash recovery", status: "done", milestone: "M0" },
-      { id: "F7", name: "Live visualization", status: "planned", milestone: "M1" },
+      { id: "F7", name: "Live visualization", status: "planned", milestone: "M1b" },
       { id: "F8", name: "Knowledge graph context", status: "planned", milestone: "M3" },
       { id: "F9", name: "Compounding memory", status: "planned", milestone: "M3" },
       { id: "F10", name: "Packs", status: "planned", milestone: "M4" },
-      { id: "F11", name: "Multi-project portfolio", status: "partial", milestone: "M0 → M4" },
+      { id: "F11", name: "Multi-project portfolio", status: "partial", milestone: "M0/M1a → M4" },
     ],
     adrs: [
       {
         num: "001", title: "REST API Response Structure & Query Parameters",
-        status: "done", binds: "Binds /api work in M1",
+        status: "done", binds: "Binds /api — implemented in M1a",
       },
     ],
     changelog: [
+      { date: "2026-07-21", text: "<strong>M1a (backend: real gates + REST API) merged to master.</strong> Final whole-branch review caught and fixed a derived-gate-rejection wedge and a foundry-serve restart-recovery gap before merge. 72/72 tests." },
+      { date: "2026-07-21", text: "10-task subagent-driven build: Store versioning/redaction → real pending gates (removed M0 auto-approve) → ADR-001 envelope/errors → background Scheduler → Projects/Runs/Gates/Cancel/SSE APIs → <code>foundry serve</code>." },
+      { date: "2026-07-20", text: "M1a implementation plan written and approved — split M1 into M1a (backend/API) and M1b (dashboard), same pattern as M0's core/driver split." },
       { date: "2026-07-20", text: "<strong>ADR practice made binding</strong> — design doc §13.1 requires plans to check <code>docs/adrs/</code> before implementing anything an existing ADR covers." },
       { date: "2026-07-20", text: "<strong>ADR-001 accepted</strong> — REST API response envelope, pagination, error shape for the future <code>/api</code> surface." },
       { date: "2026-07-20", text: "Local dev workflow set up: <code>.claude/CLAUDE.md</code>, <code>git-workflow.md</code>, ruff quality gate on pre-commit, ADR scaffold." },
@@ -564,6 +567,7 @@
 
   const statusMeta = {
     done: { label: "Shipped", cls: "done" },
+    active: { label: "In progress", cls: "partial" },
     partial: { label: "Partial", cls: "partial" },
     planned: { label: "Planned", cls: "planned" },
     deferred: { label: "Deferred", cls: "deferred" },
