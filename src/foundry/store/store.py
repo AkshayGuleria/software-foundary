@@ -117,6 +117,8 @@ class Store:
     async def update_run(self, run_id: str, **fields) -> None:
         async def _op(session):
             run = await session.get(Run, run_id)
+            if run is None:
+                raise ValueError(f"Run {run_id} not found")
             for key, value in fields.items():
                 setattr(run, key, value)
 

@@ -223,3 +223,11 @@ async def test_append_event_redacts_payload_before_persisting(tmp_path):
     assert events[0].payload_json["ok"] is True
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_update_run_raises_for_unknown_run_id(tmp_path):
+    store = await make_store(tmp_path)
+    with pytest.raises(ValueError, match="not found"):
+        await store.update_run("does-not-exist", status="closed")
+    await store.stop()
