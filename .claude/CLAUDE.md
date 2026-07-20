@@ -65,3 +65,4 @@ from the plan brief first, watch it fail, then implement.
 | Implementation plans (one per milestone) | `docs/superpowers/plans/` |
 | Architecture decision records | `docs/adrs/` |
 | Full git workflow | `.claude/git-workflow.md` |
+| Build-status tracker (Artifact source — redeploy after each milestone) | `docs/status.html` |

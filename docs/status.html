@@ -1,0 +1,642 @@
+<!--
+  Source for the Foundry build-status Artifact.
+  Live URL: https://claude.ai/code/artifact/07f00b51-4de4-4136-8354-5b0906486f9b
+  To update: edit the DATA object at the bottom of this file to reflect current
+  status, then redeploy to the same URL (Artifact tool, same file_path or pass
+  the URL above). Update after every milestone task/plan lands, not just at
+  milestone completion — the DATA.changelog array is meant to grow incrementally.
+-->
+<title>Foundry — Build Status</title>
+<style>
+  :root {
+    --bg: #13161b;
+    --surface: #191d24;
+    --surface-2: #1f2530;
+    --border: #2a303b;
+    --border-soft: #232833;
+    --text: #e7eaee;
+    --text-dim: #a4abb6;
+    --text-faint: #6b7280;
+    --accent: #e8752c;
+    --accent-dim: #a8511e;
+    --done: #4fae7c;
+    --done-dim: #234232;
+    --partial: #d9a441;
+    --partial-dim: #40350f;
+    --planned: #5b6472;
+    --planned-dim: #232830;
+    --deferred: #c96a5a;
+    --deferred-dim: #3a2320;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(232,117,44,0.07), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-dim); color: #fff; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, details summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  code, .mono { font-family: var(--mono); }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  .page {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+  }
+
+  /* ---------- Header ---------- */
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(232,117,44,0.18);
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  header.hero p {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--text-dim);
+    font-size: 15.5px;
+  }
+  .meta-line {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin-top: 4px;
+  }
+  .meta-line strong { color: var(--text-dim); font-weight: 500; }
+
+  /* ---------- Stat strip ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat .value {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .stat .value.accent { color: var(--accent); }
+  .stat .value.done { color: var(--done); }
+  .stat .label {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  /* ---------- Section headings ---------- */
+  section { margin-bottom: 52px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 10px;
+  }
+  .section-head h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin: 0;
+  }
+  .section-head .hint {
+    font-size: 12.5px;
+    color: var(--text-faint);
+  }
+
+  /* ---------- Status pill ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 9px 3px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .pill.done { background: var(--done-dim); color: var(--done); }
+  .pill.partial { background: var(--partial-dim); color: var(--partial); }
+  .pill.planned { background: var(--planned-dim); color: var(--planned); }
+  .pill.deferred { background: var(--deferred-dim); color: var(--deferred); }
+
+  /* ---------- Roadmap timeline ---------- */
+  .timeline { position: relative; }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 21px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent) 0%, var(--border) 18%, var(--border) 100%);
+  }
+  .milestone {
+    position: relative;
+    padding: 0 0 34px 56px;
+  }
+  .milestone:last-child { padding-bottom: 0; }
+  .milestone .marker {
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-faint);
+  }
+  .milestone.done .marker {
+    border-color: var(--done);
+    color: var(--done);
+    box-shadow: 0 0 0 4px var(--done-dim);
+  }
+  .milestone.active .marker {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(232,117,44,0.14);
+  }
+  .m-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .m-head h3 {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .m-duration {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
+  .m-scope {
+    color: var(--text-dim);
+    font-size: 14px;
+    max-width: 68ch;
+    margin: 0 0 10px;
+  }
+  .m-scope code { color: var(--text); font-size: 0.92em; }
+
+  details.exit {
+    margin-top: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  details.exit summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 9px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+  }
+  details.exit summary::-webkit-details-marker { display: none; }
+  details.exit summary::before {
+    content: "▸";
+    color: var(--text-faint);
+    transition: transform 0.15s ease;
+  }
+  details.exit[open] summary::before { transform: rotate(90deg); }
+  details.exit .exit-body {
+    padding: 4px 14px 14px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .criterion {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 7px 0;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .criterion + .criterion { border-top: 1px solid var(--border-soft); }
+  .criterion .check {
+    flex: none;
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .criterion.met .check { background: var(--done-dim); color: var(--done); }
+  .criterion.pending .check { background: var(--planned-dim); color: var(--text-faint); }
+  .criterion.met span.txt { color: var(--text); }
+
+  /* ---------- Requirements table ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--surface-2);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.015); }
+  td.req-id { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
+  td.req-name { color: var(--text); }
+  td.req-milestone { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+
+  /* ---------- ADR list ---------- */
+  .adr-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .adr-row + .adr-row { margin-top: 8px; }
+  .adr-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-faint);
+    flex: none;
+    width: 46px;
+  }
+  .adr-title { flex: 1; color: var(--text); font-size: 14px; min-width: 200px; }
+  .adr-title .binds { display: block; font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+
+  /* ---------- Changelog ---------- */
+  .changelog { display: flex; flex-direction: column; gap: 0; }
+  .change {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-soft);
+    font-size: 13.5px;
+  }
+  .change:first-child { border-top: none; }
+  .change time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    padding-top: 1px;
+  }
+  .change .desc { color: var(--text-dim); }
+  .change .desc strong { color: var(--text); font-weight: 600; }
+  .change .desc code { font-size: 0.9em; }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  @media (max-width: 560px) {
+    .page { padding: 36px 16px 64px; }
+    h1 { font-size: 26px; }
+    .timeline::before { left: 17px; }
+    .milestone { padding-left: 46px; }
+    .milestone .marker { width: 36px; height: 36px; font-size: 11px; }
+    .change { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span>Foundry — Build Status</div>
+    <h1>Autonomous development pipeline platform</h1>
+    <p>Plan-first, phase-gated, provider-agnostic agent orchestration. This page tracks
+       implementation against <code>docs/software-foundary-design.md</code> and is
+       updated as each milestone lands — it is a snapshot, not a live query.</p>
+    <div class="meta-line">
+      <span><strong>Repo:</strong> software-foundary</span>
+      <span><strong>Design doc:</strong> v1, 2026-07-12</span>
+      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-20</span>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <section id="roadmap-section">
+    <div class="section-head">
+      <h2>Roadmap</h2>
+      <span class="hint">§15 — durability before UX, parallelism before intelligence, packs last</span>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <section id="requirements-section">
+    <div class="section-head">
+      <h2>Requirements traceability</h2>
+      <span class="hint">§2.1 functional requirements</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Requirement</th><th>Status</th><th>Milestone</th></tr>
+        </thead>
+        <tbody id="req-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="adr-section">
+    <div class="section-head">
+      <h2>Architecture decisions</h2>
+      <span class="hint">docs/adrs/ — binding per design doc §13.1</span>
+    </div>
+    <div id="adr-list"></div>
+  </section>
+
+  <section id="changelog-section">
+    <div class="section-head">
+      <h2>Recent activity</h2>
+      <span class="hint">most recent first</span>
+    </div>
+    <div class="changelog" id="changelog"></div>
+  </section>
+
+  <footer>
+    <span>Source of truth: <code>docs/software-foundary-design.md</code> · <code>docs/adrs/</code> · <code>docs/superpowers/plans/</code></span>
+    <span id="progress-footer"></span>
+  </footer>
+
+</div>
+
+<script>
+  // ---- Data model. Edit this block as implementation progresses, then re-render. ----
+  const DATA = {
+    stats: [
+      { label: "Milestones shipped", value: "1 / 6", accent: false },
+      { label: "Tests passing", value: "28 / 28", done: true },
+      { label: "Requirements met", value: "3 / 11", accent: false },
+      { label: "ADRs accepted", value: "1", accent: false },
+    ],
+    milestones: [
+      {
+        id: "M0", name: "Durable core", duration: "2–3 weeks", status: "done",
+        scope: "Store schema (WAL, single-writer task) + event log; playbook parser + DAG materializer; orchestrator tick loop (reconcile/unblock/dispatch/collect/retry); <code>FakeDriver</code> first; CLI (<code>foundry run</code>, <code>foundry events</code>).",
+        criteria: [
+          { met: true, text: "Full engine test suite green on FakeDriver, including a simulated kill‑9 mid‑run → restart → run completes, zero tokens spent" },
+          { met: false, text: "Same 3‑step linear playbook runs end‑to‑end on a real repo via ClaudeCodeDriver — deferred to a follow‑up plan (/internal API + real driver), not started" },
+        ],
+      },
+      {
+        id: "M1", name: "Plan-first + gates + dashboard MVP", duration: "3–4 weeks", status: "planned",
+        scope: "Artifact schemas + validation (<code>notes_addressed</code> contract); human gates with reject/rework loop; <code>human_task</code> units + My‑queue view; derived plan‑approval gate with cost estimate; dashboard (runs home, run detail, SSE feed); cancel propagation; event redaction. <code>/api</code> conforms to ADR‑001.",
+        criteria: [
+          { met: false, text: "Full plan → approve → implement → reject → rework → approve cycle driven entirely from the browser" },
+          { met: false, text: "Two registered projects running concurrently — first daily‑drivable version" },
+        ],
+      },
+      {
+        id: "M2", name: "Fan-out + review loop + second provider", duration: "3 weeks", status: "planned",
+        scope: "Convoys + <code>fan_out</code>; per‑unit worktrees; <code>integrate</code> step (build‑order merge, conflict escalation); agent‑review loop with round cap; fleet + DAG view; CodexDriver; concurrency caps + token budgets; metrics rollup.",
+        criteria: [
+          { met: false, text: "3‑slice feature implemented by parallel agents (mixed providers), peer‑reviewed, integrated to one branch with ≥1 auto‑resolved conflict, visualized live" },
+        ],
+      },
+      {
+        id: "M3", name: "Knowledge graph + memory", duration: "3 weeks", status: "planned",
+        scope: "KGService wrapping code‑review‑graph; context bundles on <code>/internal/context</code>; reviewer risk scores + cross‑slice interference warnings; compound step + memory store + prompt injection + proposed‑memory gating.",
+        criteria: [
+          { met: false, text: "Measured token reduction on implement/review steps vs. M2 baseline" },
+          { met: false, text: "Second run of a similar feature demonstrably references a lesson from the first" },
+        ],
+      },
+      {
+        id: "M4", name: "Packs + portfolio + polish", duration: "2–3 weeks", status: "planned",
+        scope: "Pack manifest + loader + imports + version pinning; extract built‑in SDLC playbook into the default pack; gate‑policy overrides; chat‑to‑role; portfolio home + cross‑project fair scheduling + project lifecycle.",
+        criteria: [
+          { met: false, text: "A second, different playbook added purely as pack content — zero engine changes" },
+          { met: false, text: "Five projects registered, three running concurrently, portfolio home showing attention‑ranked health" },
+        ],
+      },
+      {
+        id: "M5", name: "Team-shared", duration: "3–4 weeks, when needed", status: "planned",
+        scope: "Postgres migration; auth (basic → OIDC); multi‑user approvals with decider identity; unit‑claim for N workers; Docker single‑image deploy; notification hooks.",
+        criteria: [
+          { met: false, text: "Two users on one deployment, approving gates on shared runs, agents executing on the server" },
+        ],
+      },
+    ],
+    requirements: [
+      { id: "F1", name: "Plan-first runs", status: "partial", milestone: "M0 → M1" },
+      { id: "F2", name: "Artifact gates everywhere", status: "partial", milestone: "M0 → M1" },
+      { id: "F3", name: "Declarative playbooks", status: "done", milestone: "M0" },
+      { id: "F4", name: "Parallel fan-out", status: "planned", milestone: "M2" },
+      { id: "F5", name: "Provider-agnostic agents", status: "partial", milestone: "M0 → M2" },
+      { id: "F6", name: "Durable work + crash recovery", status: "done", milestone: "M0" },
+      { id: "F7", name: "Live visualization", status: "planned", milestone: "M1" },
+      { id: "F8", name: "Knowledge graph context", status: "planned", milestone: "M3" },
+      { id: "F9", name: "Compounding memory", status: "planned", milestone: "M3" },
+      { id: "F10", name: "Packs", status: "planned", milestone: "M4" },
+      { id: "F11", name: "Multi-project portfolio", status: "partial", milestone: "M0 → M4" },
+    ],
+    adrs: [
+      {
+        num: "001", title: "REST API Response Structure & Query Parameters",
+        status: "done", binds: "Binds /api work in M1",
+      },
+    ],
+    changelog: [
+      { date: "2026-07-20", text: "<strong>ADR practice made binding</strong> — design doc §13.1 requires plans to check <code>docs/adrs/</code> before implementing anything an existing ADR covers." },
+      { date: "2026-07-20", text: "<strong>ADR-001 accepted</strong> — REST API response envelope, pagination, error shape for the future <code>/api</code> surface." },
+      { date: "2026-07-20", text: "Local dev workflow set up: <code>.claude/CLAUDE.md</code>, <code>git-workflow.md</code>, ruff quality gate on pre-commit, ADR scaffold." },
+      { date: "2026-07-20", text: "<strong>M0 durable core merged to master.</strong> Final whole-branch review caught and fixed a crash-recovery window and a gate auto-approval gap before merge. 28/28 tests." },
+      { date: "2026-07-20", text: "7-task subagent-driven build: store schema → Store CRUD → playbook parser/lint → DAG materializer → AgentDriver/FakeDriver → orchestrator tick loop → CLI." },
+      { date: "2026-07-20", text: "M0 durable-core implementation plan written and approved." },
+      { date: "2026-07-20", text: "Repo skeleton created; design doc adopted as source of truth." },
+    ],
+  };
+
+  const statusMeta = {
+    done: { label: "Shipped", cls: "done" },
+    partial: { label: "Partial", cls: "partial" },
+    planned: { label: "Planned", cls: "planned" },
+    deferred: { label: "Deferred", cls: "deferred" },
+  };
+
+  function pill(status) {
+    const m = statusMeta[status];
+    return `<span class="pill ${m.cls}">${m.label}</span>`;
+  }
+
+  // Stats
+  document.getElementById("stats").innerHTML = DATA.stats.map(s => `
+    <div class="stat">
+      <span class="value ${s.done ? 'done' : (s.accent ? 'accent' : '')} tabular">${s.value}</span>
+      <span class="label">${s.label}</span>
+    </div>
+  `).join("");
+
+  // Timeline
+  document.getElementById("timeline").innerHTML = DATA.milestones.map(m => {
+    const stateClass = m.status === "done" ? "done" : (m.status === "active" ? "active" : "");
+    const criteria = m.criteria.map(c => `
+      <div class="criterion ${c.met ? 'met' : 'pending'}">
+        <span class="check">${c.met ? '✓' : ''}</span>
+        <span class="txt">${c.text}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="milestone ${stateClass}">
+        <div class="marker">${m.id}</div>
+        <div class="m-head">
+          <h3>${m.name}</h3>
+          ${pill(m.status)}
+          <span class="m-duration">${m.duration}</span>
+        </div>
+        <p class="m-scope">${m.scope}</p>
+        <details class="exit">
+          <summary>Exit criteria</summary>
+          <div class="exit-body">${criteria}</div>
+        </details>
+      </div>
+    `;
+  }).join("");
+
+  // Requirements
+  document.getElementById("req-body").innerHTML = DATA.requirements.map(r => `
+    <tr>
+      <td class="req-id">${r.id}</td>
+      <td class="req-name">${r.name}</td>
+      <td>${pill(r.status)}</td>
+      <td class="req-milestone">${r.milestone}</td>
+    </tr>
+  `).join("");
+
+  // ADRs
+  document.getElementById("adr-list").innerHTML = DATA.adrs.map(a => `
+    <div class="adr-row">
+      <span class="adr-num mono">ADR-${a.num}</span>
+      <span class="adr-title">${a.title}<span class="binds">${a.binds}</span></span>
+      ${pill(a.status)}
+    </div>
+  `).join("");
+
+  // Changelog
+  document.getElementById("changelog").innerHTML = DATA.changelog.map(c => `
+    <div class="change">
+      <time class="tabular">${c.date}</time>
+      <div class="desc">${c.text}</div>
+    </div>
+  `).join("");
+
+  // Footer progress
+  const doneCount = DATA.milestones.filter(m => m.status === "done").length;
+  document.getElementById("progress-footer").textContent =
+    `${doneCount} of ${DATA.milestones.length} milestones shipped`;
+</script>
