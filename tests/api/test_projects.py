@@ -60,3 +60,15 @@ async def test_list_projects_rejects_limit_over_100(api_client):
 
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_create_project_with_malformed_body_returns_adr001_envelope(api_client):
+    client, _store, _scheduler = api_client
+
+    resp = await client.post("/api/projects", json={"name": "missing-path-field"})
+
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["path"] == "/api/projects"

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
-from foundry.api.errors import FoundryApiError, foundry_api_error_handler
+from foundry.api.errors import (
+    FoundryApiError,
+    foundry_api_error_handler,
+    request_validation_error_handler,
+)
 from foundry.api.routes.projects import router as projects_router
 from foundry.api.scheduler import Scheduler
 from foundry.store.store import Store
@@ -14,6 +19,7 @@ def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
     app.state.scheduler = scheduler
 
     app.add_exception_handler(FoundryApiError, foundry_api_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
 
     app.include_router(projects_router, prefix="/api")
 

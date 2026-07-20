@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from foundry.api.schemas import ApiError, ErrorEnvelope
@@ -54,3 +55,17 @@ async def foundry_api_error_handler(request: Request, exc: FoundryApiError) -> J
         )
     )
     return JSONResponse(status_code=exc.status_code, content=envelope.model_dump())
+
+
+async def request_validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    envelope = ErrorEnvelope(
+        error=ApiError(
+            code="VALIDATION_ERROR",
+            message="Request validation failed",
+            status_code=400,
+            timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+            path=str(request.url.path),
+            details={"errors": exc.errors()},
+        )
+    )
+    return JSONResponse(status_code=400, content=envelope.model_dump())

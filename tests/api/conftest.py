@@ -21,3 +21,4 @@ async def api_client(tmp_path):
         yield client, store, scheduler
 
     await store.stop()
+    await engine.dispose()
