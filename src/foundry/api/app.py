@@ -9,6 +9,7 @@ from foundry.api.errors import (
     request_validation_error_handler,
 )
 from foundry.api.routes.projects import router as projects_router
+from foundry.api.routes.runs import router as runs_router
 from foundry.api.scheduler import Scheduler
 from foundry.store.store import Store
 
@@ -22,6 +23,7 @@ def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
 
     app.include_router(projects_router, prefix="/api")
+    app.include_router(runs_router, prefix="/api")
 
     @app.get("/api/_health")
     async def health() -> dict:
