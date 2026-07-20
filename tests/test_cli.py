@@ -40,3 +40,13 @@ def test_run_with_bad_playbook_reports_error_not_traceback(tmp_path):
     assert run_result.exit_code != 0
     assert "does_not_exist" in run_result.stderr
     assert "Traceback" not in run_result.output
+
+
+def test_run_auto_approves_gated_steps_for_local_fake_driver_convenience(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+
+    result = runner.invoke(app, ["run", "tests/orchestrator/fixtures/gated_demo.toml", "--db", db_path])
+
+    assert result.exit_code == 0, result.output
+    run_id = result.output.strip()
+    assert len(run_id) == 26

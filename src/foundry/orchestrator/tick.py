@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from foundry.drivers.base import AgentDriver, SessionSpec
 from foundry.playbook.schema import PlaybookSpec, StepSpec
-from foundry.store.models import WorkUnit
+from foundry.store.models import Gate, WorkUnit
 from foundry.store.store import Store
 
 
@@ -28,7 +28,7 @@ class Orchestrator:
         await self.reconcile(run_id)
         await self.apply_gate_decisions(run_id)
         await self.unblock(run_id)
-        await self._close_derived_gates(run_id)
+        await self._gate_derived_units(run_id)
         dispatched = await self.dispatch(run_id)
 
         units = await self.store.list_units(run_id)
@@ -116,8 +116,6 @@ class Orchestrator:
                         gate_id = gate.id
                     else:
                         gate = existing_gate
-                    if gate.decision == "pending":
-                        await self.store.decide_gate(gate.id, "approved", decided_by="system-auto-m0")
                     await self.store.update_unit(unit.id, status="blocked")
                     payload = {"recovered": True}
                     if gate_id is not None:
@@ -146,7 +144,19 @@ class Orchestrator:
         units = {u.id: u for u in await self.store.list_units(run_id)}
         gates = await self.store.list_gates_for_run(run_id)
 
+        # A rejected gate reopens its unit, which (on rework) gets a brand-new gate
+        # for the same work_unit_id. Only the most-recently-created gate per unit
+        # (ids are ULIDs, so lexicographic == chronological) is "live" — without
+        # this, a stale already-actioned rejection would be replayed against the
+        # unit forever once it cycles back through "blocked", reopening it on every
+        # subsequent tick and duplicating rework indefinitely.
+        latest_by_unit: dict[str, Gate] = {}
         for gate in gates:
+            current = latest_by_unit.get(gate.work_unit_id)
+            if current is None or gate.id > current.id:
+                latest_by_unit[gate.work_unit_id] = gate
+
+        for gate in latest_by_unit.values():
             if gate.decision == "pending":
                 continue
             unit = units.get(gate.work_unit_id)
@@ -165,12 +175,19 @@ class Orchestrator:
             await self.store.update_unit(unit.id, status="ready")
             await self.store.append_event(run_id, unit.id, "unit.ready", {})
 
-    async def _close_derived_gates(self, run_id: str) -> None:
+    async def _gate_derived_units(self, run_id: str) -> None:
         units = await self.store.list_units(run_id)
+        gates = await self.store.list_gates_for_run(run_id)
+        already_gated = {g.work_unit_id for g in gates}
+
         for unit in units:
-            if unit.type == "gate" and unit.status == "ready":
-                await self.store.update_unit(unit.id, status="closed")
-                await self.store.append_event(run_id, unit.id, "gate.derived_approved", {})
+            if unit.type != "gate" or unit.status != "ready":
+                continue
+            if unit.id in already_gated:
+                continue
+            await self.store.create_gate(work_unit_id=unit.id, gate_type="derived", decision="pending")
+            await self.store.update_unit(unit.id, status="blocked")
+            await self.store.append_event(run_id, unit.id, "gate.created", {"gate_type": "derived"})
 
     async def dispatch(self, run_id: str) -> int:
         units = await self.store.list_units(run_id)
@@ -257,7 +274,7 @@ class Orchestrator:
             run_id=run_id,
             work_unit_id=task_unit.id,
             kind=step.produces or "artifact",
-            version=1,
+            version=await self.store.get_next_artifact_version(task_unit.id),
             produced_by_role=step.role,
             payload_json=artifact_payload,
         )
@@ -273,10 +290,8 @@ class Orchestrator:
                 gate_type=step.gate,
                 decision="pending",
             )
-            # M0 has no human/agent approval UI yet; auto-approve gates produced by a
-            # successful step so the task closes on the next tick. Gates created by the
-            # max-attempts failure-escalation path are NOT touched here — those must
-            # stay pending for an actual human to look at.
-            await self.store.decide_gate(gate.id, "approved", decided_by="system-auto-m0")
+            # M1: the gate stays pending. A human (or, for local FakeDriver smoke
+            # runs, the CLI's own auto-approve convenience loop) decides via
+            # Store.decide_gate — apply_gate_decisions() picks it up next tick.
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})

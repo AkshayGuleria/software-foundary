@@ -47,7 +47,28 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
     orchestrator = Orchestrator(store, FakeDriver(script), playbook)
+
     result = await orchestrator.run_to_completion(run_row.id)
+    for _ in range(20):
+        if result.complete:
+            break
+        gates = await store.list_gates_for_run(run_row.id)
+        # Only auto-approve gates that gate a produced artifact (artifact_id set)
+        # or a derived plan-approval gate (gate_type == "derived"). A failure-
+        # escalation gate (no artifact_id, gate_type == "human") represents a
+        # step that failed max_attempts times with no output — approving that
+        # would close a task that never actually produced anything, which is
+        # exactly the silent-failure the escalation gate exists to prevent.
+        approvable = [
+            g
+            for g in gates
+            if g.decision == "pending" and (g.artifact_id is not None or g.gate_type == "derived")
+        ]
+        if not approvable:
+            break
+        for gate in approvable:
+            await store.decide_gate(gate.id, "approved", decided_by="cli-auto")
+        result = await orchestrator.run_to_completion(run_row.id)
 
     pending_count = 0
     if not result.complete:

@@ -241,10 +241,9 @@ async def test_reconcile_recovers_orphaned_task_with_existing_artifact_closes_di
 
 
 @pytest.mark.asyncio
-async def test_reconcile_recovers_orphaned_gated_task_with_existing_artifact_auto_approves(tmp_path):
-    """Finding 1 + Finding 2 combined: the recovery path for a gated step must also
-    auto-approve the gate it creates (or finds), the same as the normal success path.
-    """
+async def test_reconcile_recovers_orphaned_gated_task_with_pending_gate(tmp_path):
+    """The crash-recovery path for a gated step creates the same kind of pending
+    gate the normal success path does — it must not auto-approve either."""
     store = await make_store(tmp_path)
     project = await store.create_project("demo7", str(tmp_path))
     playbook = load_playbook(GATED_FIXTURE)
@@ -274,29 +273,33 @@ async def test_reconcile_recovers_orphaned_gated_task_with_existing_artifact_aut
     orchestrator = Orchestrator(store, FakeDriver(script), playbook)
     result = await orchestrator.run_to_completion(run.id)
 
-    assert result.complete is True
-    task_units = [u for u in await store.list_units(run.id) if u.type == "task"]
-    assert all(u.status == "closed" for u in task_units)
+    assert result.complete is False
+    a_task = await store.get_unit(a_task.id)
+    assert a_task.status == "blocked"
 
     gates = await store.list_gates_for_run(run.id)
     assert len(gates) == 1
     assert gates[0].work_unit_id == a_task.id
-    assert gates[0].decision == "approved"
+    assert gates[0].decision == "pending"
 
     artifacts = await store.list_artifacts(run.id)
     a_artifacts = [x for x in artifacts if x.kind == "a_artifact"]
-    assert len(a_artifacts) == 1
+    assert len(a_artifacts) == 1  # recovery reused the existing artifact, didn't duplicate it
 
     events = await store.list_events(run.id)
     assert any(e.type == "gate.created" and e.payload_json.get("recovered") is True for e in events)
+
+    await store.decide_gate(gates[0].id, "approved", decided_by="test-human")
+    result = await orchestrator.run_to_completion(run.id)
+    assert result.complete is True
 
     await store.stop()
 
 
 @pytest.mark.asyncio
-async def test_gated_step_auto_approves_and_run_completes(tmp_path):
-    """Finding 2: M0 has no human-approval UI, so gates on successful steps must be
-    auto-approved rather than blocking the run forever."""
+async def test_gated_step_creates_pending_gate_then_completes_once_decided(tmp_path):
+    """M1: gates on successful steps stay pending until a human (here, the test
+    standing in for the API) decides — they no longer auto-approve."""
     store = await make_store(tmp_path)
     project = await store.create_project("demo6", str(tmp_path))
     playbook = load_playbook(GATED_FIXTURE)
@@ -310,15 +313,57 @@ async def test_gated_step_auto_approves_and_run_completes(tmp_path):
     orchestrator = Orchestrator(store, FakeDriver(script), playbook)
 
     result = await orchestrator.run_to_completion(run.id)
-
-    assert result.complete is True
-    task_units = [u for u in await store.list_units(run.id) if u.type == "task"]
-    assert len(task_units) == 2
-    assert all(u.status == "closed" for u in task_units)
+    assert result.complete is False
 
     gates = await store.list_gates_for_run(run.id)
     assert len(gates) == 1
-    assert gates[0].decision == "approved"
-    assert gates[0].decided_by == "system-auto-m0"
+    assert gates[0].decision == "pending"
+
+    task_units = [u for u in await store.list_units(run.id) if u.type == "task"]
+    a_task = next(u for u in task_units if u.step_id == "a")
+    b_task = next(u for u in task_units if u.step_id == "b")
+    assert a_task.status == "blocked"
+    assert b_task.status == "open"  # never unblocked — "a" hasn't closed yet
+
+    await store.decide_gate(gates[0].id, "approved", decided_by="test-human")
+    result = await orchestrator.run_to_completion(run.id)
+
+    assert result.complete is True
+    task_units = [u for u in await store.list_units(run.id) if u.type == "task"]
+    assert all(u.status == "closed" for u in task_units)
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_reject_then_rework_increments_artifact_version(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("demo8", str(tmp_path))
+    playbook = load_playbook(GATED_FIXTURE)
+    run = await store.create_run(project.id, GATED_FIXTURE, "rework demo run")
+    await materialize(playbook, run.id, store)
+
+    script = {
+        "a": FakeStepScript(artifact={"round": 1}),
+        "b": FakeStepScript(artifact={"ok": True}),
+    }
+    orchestrator = Orchestrator(store, FakeDriver(script), playbook)
+    await orchestrator.run_to_completion(run.id)
+
+    gates = await store.list_gates_for_run(run.id)
+    assert len(gates) == 1
+    await store.decide_gate(gates[0].id, "rejected", feedback={"note": "try again"}, decided_by="test-human")
+
+    # rejection reopens the task; give it a fresh script for round 2 and re-run
+    orchestrator.driver = FakeDriver(
+        {"a": FakeStepScript(artifact={"round": 2}), "b": FakeStepScript(artifact={"ok": True})}
+    )
+    await orchestrator.run_to_completion(run.id)
+
+    artifacts = await store.list_artifacts(run.id)
+    a_artifacts = sorted([x for x in artifacts if x.kind == "a_artifact"], key=lambda a: a.version)
+    assert [a.version for a in a_artifacts] == [1, 2]
+    assert a_artifacts[0].payload_json == {"round": 1}
+    assert a_artifacts[1].payload_json == {"round": 2}
 
     await store.stop()
