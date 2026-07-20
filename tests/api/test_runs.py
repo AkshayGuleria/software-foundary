@@ -178,3 +178,55 @@ async def test_get_run_artifacts_latest_only_returns_max_version(api_client):
     a_artifacts = [a for a in resp.json()["data"] if a["kind"] == "a_artifact"]
     assert len(a_artifacts) == 1
     assert a_artifacts[0]["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_cancel_run_flips_non_terminal_units_and_stops_scheduling(api_client):
+    client, store, scheduler = api_client
+
+    proj = (await client.post("/api/projects", json={"name": "p", "path": "/tmp/p"})).json()["data"]["id"]
+    run_id = (
+        await client.post(
+            "/api/runs",
+            json={"project_id": proj, "playbook_path": "tests/orchestrator/fixtures/gated_demo.toml"},
+        )
+    ).json()["data"]["id"]
+
+    for _ in range(5):
+        await scheduler.tick_all_once()
+
+    resp = await client.post(f"/api/runs/{run_id}/cancel")
+    assert resp.status_code == 204
+
+    units = await store.list_units(run_id)
+    assert all(u.status in ("closed", "failed", "killed") for u in units)
+
+    run_row = await store.get_run(run_id)
+    assert run_row.status == "cancelled"
+    assert run_id not in scheduler._orchestrators
+
+
+@pytest.mark.asyncio
+async def test_double_cancel_returns_409(api_client):
+    client, _store, scheduler = api_client
+
+    proj = (await client.post("/api/projects", json={"name": "p", "path": "/tmp/p"})).json()["data"]["id"]
+    run_id = (
+        await client.post(
+            "/api/runs",
+            json={"project_id": proj, "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml"},
+        )
+    ).json()["data"]["id"]
+
+    first = await client.post(f"/api/runs/{run_id}/cancel")
+    assert first.status_code == 204
+
+    second = await client.post(f"/api/runs/{run_id}/cancel")
+    assert second.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_cancel_missing_run_returns_404(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/runs/does-not-exist/cancel")
+    assert resp.status_code == 404

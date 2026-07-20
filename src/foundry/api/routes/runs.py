@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
-from foundry.api.errors import NotFoundError, ValidationApiError, validate_paging
+from foundry.api.errors import ConflictError, NotFoundError, ValidationApiError, validate_paging
 from foundry.api.routes.projects import _get_store
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.drivers.fake import FakeDriver, FakeStepScript
@@ -11,7 +11,7 @@ from foundry.orchestrator.cost import estimate_plan_cost
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
-from foundry.store.models import Artifact, Run, WorkUnit
+from foundry.store.models import Artifact, Run, WorkUnit, utcnow
 
 router = APIRouter()
 
@@ -134,6 +134,29 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
     scheduler.register(run.id, FakeDriver(script), playbook)
 
     return ApiResponse[RunOut](data=_to_run_out(run), paging=Paging.none())
+
+
+@router.post("/runs/{run_id}/cancel", status_code=204)
+async def cancel_run(run_id: str, request: Request) -> Response:
+    store = _get_store(request)
+    scheduler = _get_scheduler(request)
+
+    run = await store.get_run(run_id)
+    if run is None:
+        raise NotFoundError(f"Run {run_id} not found")
+    if run.status in ("cancelled", "closed"):
+        raise ConflictError(f"Run {run_id} is already {run.status}")
+
+    units = await store.list_units(run_id)
+    for unit in units:
+        if unit.status not in ("closed", "failed", "killed", "cancelled"):
+            await store.update_unit(unit.id, status="killed")
+
+    await store.update_run(run_id, status="cancelled", closed_at=utcnow())
+    scheduler.unregister(run_id)
+    await store.append_event(run_id, None, "run.cancelled", {})
+
+    return Response(status_code=204)
 
 
 @router.get("/runs")
