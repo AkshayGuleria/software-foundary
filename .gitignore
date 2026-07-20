@@ -8,6 +8,7 @@ __pycache__/
 *.db-wal
 *.db-shm
 worktrees/
+.claude/
 dist/
 build/
 node_modules/
