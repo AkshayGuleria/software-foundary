@@ -46,8 +46,7 @@ those here; only add an ADR when a *new* decision is made or an existing one is 
 
 | # | Title | Date | Status | Topic |
 |---|-------|------|--------|-------|
-
-*(none yet — add a row here when the first post-design-doc ADR lands)*
+| [001](./001-api-response-structure.md) | REST API Response Structure & Query Parameters | 2026-07-20 | Accepted | API Standards |
 
 ## Lifecycle
 
