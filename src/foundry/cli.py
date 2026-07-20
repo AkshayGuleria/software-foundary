@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 
 import typer
+import uvicorn
 
+from foundry.api.app import create_app
+from foundry.api.scheduler import Scheduler
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.tick import Orchestrator
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
@@ -100,3 +103,28 @@ async def _events(run_id: str, db: str, once: bool) -> None:
         await asyncio.sleep(0.2)
 
     await store.stop()
+
+
+@app.command()
+def serve(db: str = "foundry.db", host: str = "127.0.0.1", port: int = 8000) -> None:
+    asyncio.run(_serve(db, host, port))
+
+
+async def _serve(db: str, host: str, port: int) -> None:
+    engine = make_engine(db)
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+
+    scheduler = Scheduler(store)
+    await scheduler.start()
+
+    api_app = create_app(store, scheduler)
+    config = uvicorn.Config(api_app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+
+    try:
+        await server.serve()
+    finally:
+        await scheduler.stop()
+        await store.stop()
