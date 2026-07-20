@@ -8,6 +8,7 @@ from foundry.api.errors import (
     foundry_api_error_handler,
     request_validation_error_handler,
 )
+from foundry.api.routes.gates import router as gates_router
 from foundry.api.routes.projects import router as projects_router
 from foundry.api.routes.runs import router as runs_router
 from foundry.api.scheduler import Scheduler
@@ -24,6 +25,7 @@ def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
 
     app.include_router(projects_router, prefix="/api")
     app.include_router(runs_router, prefix="/api")
+    app.include_router(gates_router, prefix="/api")
 
     @app.get("/api/_health")
     async def health() -> dict:
