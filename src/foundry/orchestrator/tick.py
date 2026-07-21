@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from foundry.drivers.base import AgentDriver, SessionSpec
+from foundry.orchestrator.budget import check_budget
 from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
 from foundry.store.models import Artifact, Gate, UnitDep, WorkUnit
@@ -354,6 +355,32 @@ class Orchestrator:
         in_progress = sum(1 for u in units if u.status == "in_progress" and u.type == "task")
         slots = max(0, self.concurrency - in_progress)
 
+        run = await self.store.get_run(run_id)
+        if run is not None and check_budget(run) == "exceeded":
+            events = await self.store.list_events(run_id)
+            already_flagged = any(e.type == "budget.exceeded" for e in events)
+            if not already_flagged:
+                await self.store.append_event(
+                    run_id,
+                    None,
+                    "budget.exceeded",
+                    {"tokens_used": run.tokens_used, "token_budget": run.token_budget},
+                )
+                await self.store.create_work_units(
+                    [WorkUnit(run_id=run_id, step_id="_budget", type="human_task", status="open")]
+                )
+            return 0
+        if run is not None and check_budget(run) == "warning":
+            events = await self.store.list_events(run_id)
+            already_flagged = any(e.type == "budget.warning" for e in events)
+            if not already_flagged:
+                await self.store.append_event(
+                    run_id,
+                    None,
+                    "budget.warning",
+                    {"tokens_used": run.tokens_used, "token_budget": run.token_budget},
+                )
+
         dispatched = 0
         for task_unit in ready_tasks[:slots]:
             step = self._steps_by_id[task_unit.step_id]
@@ -421,6 +448,11 @@ class Orchestrator:
             elif ev.kind == "failed":
                 failed = True
                 error_payload = ev.payload
+            elif ev.kind == "usage":
+                total = ev.payload.get("tokens_in", 0) + ev.payload.get("tokens_out", 0)
+                run = await self.store.get_run(run_id)
+                if run is not None:
+                    await self.store.update_run(run_id, tokens_used=run.tokens_used + total)
 
         await self.store.update_unit(session_unit.id, status="failed" if failed else "closed")
         await self.store.update_session_row(session_unit.id, status="ended")
