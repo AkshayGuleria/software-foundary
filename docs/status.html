@@ -423,7 +423,7 @@
     <div class="meta-line">
       <span><strong>Repo:</strong> software-foundary</span>
       <span><strong>Design doc:</strong> v1, 2026-07-12</span>
-      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-21</span>
+      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-21 (M1 complete)</span>
     </div>
   </header>
 
@@ -479,9 +479,9 @@
   // ---- Data model. Edit this block as implementation progresses, then re-render. ----
   const DATA = {
     stats: [
-      { label: "Milestones shipped", value: "1 / 6", accent: false },
-      { label: "Tests passing", value: "72 / 72", done: true },
-      { label: "Requirements met", value: "3 / 11", accent: false },
+      { label: "Milestones shipped", value: "2 / 6", accent: false },
+      { label: "Tests passing", value: "100 / 100", done: true },
+      { label: "Requirements met", value: "5 / 11", accent: false },
       { label: "ADRs accepted", value: "1", accent: false },
     ],
     milestones: [
@@ -494,11 +494,11 @@
         ],
       },
       {
-        id: "M1", name: "Plan-first + gates + dashboard MVP", duration: "3–4 weeks", status: "active",
-        scope: "<strong>M1a (backend, shipped):</strong> real API‑driven gates (no more auto‑approve) with reject/rework loop and artifact versioning; derived plan‑approval gate with cost estimate; FastAPI <code>/api</code> — projects, runs, gates, cancel, SSE stream, all conforming to ADR‑001; background scheduler; <code>foundry serve</code>. <strong>M1b (dashboard, not started):</strong> React/Vite/TS/Tailwind UI, <code>human_task</code> My‑queue view, event redaction glob config, <code>notes_addressed</code> chat contract.",
+        id: "M1", name: "Plan-first + gates + dashboard MVP", duration: "3–4 weeks", status: "done",
+        scope: "<strong>M1a (backend):</strong> real API‑driven gates (no more auto‑approve) with reject/rework loop and artifact versioning; derived plan‑approval gate with cost estimate; FastAPI <code>/api</code> — projects, runs, gates, cancel, SSE stream, all conforming to ADR‑001; background scheduler; <code>foundry serve</code>. <strong>M1b (dashboard):</strong> React/Vite/TS/Tailwind UI — projects page, runs home, run detail (pipeline ribbon, gates/artifacts panel, live SSE feed), cancel. <em>Deferred to a later milestone:</em> <code>human_task</code> My‑queue view, event redaction glob config, <code>notes_addressed</code> chat contract.",
         criteria: [
-          { met: true, text: "Full plan → approve → implement → reject → rework → approve cycle — proven end‑to‑end over the HTTP API (M1a); 'driven entirely from the browser' still needs M1b's dashboard" },
-          { met: false, text: "Two registered projects running concurrently — first daily‑drivable version (needs the dashboard, M1b)" },
+          { met: true, text: "Full plan → approve → implement → reject → rework → approve → cancel cycle — proven end‑to‑end driven entirely from the browser (M1b), on top of the HTTP API M1a already proved" },
+          { met: true, text: "First daily‑drivable version — register a project, start a run, and work it entirely through the dashboard" },
         ],
       },
       {
@@ -533,13 +533,13 @@
       },
     ],
     requirements: [
-      { id: "F1", name: "Plan-first runs", status: "partial", milestone: "M0/M1a → M1b" },
-      { id: "F2", name: "Artifact gates everywhere", status: "partial", milestone: "M0/M1a → M1b" },
+      { id: "F1", name: "Plan-first runs", status: "done", milestone: "M0/M1a/M1b" },
+      { id: "F2", name: "Artifact gates everywhere", status: "done", milestone: "M0/M1a/M1b" },
       { id: "F3", name: "Declarative playbooks", status: "done", milestone: "M0" },
       { id: "F4", name: "Parallel fan-out", status: "planned", milestone: "M2" },
       { id: "F5", name: "Provider-agnostic agents", status: "partial", milestone: "M0 → M2" },
       { id: "F6", name: "Durable work + crash recovery", status: "done", milestone: "M0" },
-      { id: "F7", name: "Live visualization", status: "planned", milestone: "M1b" },
+      { id: "F7", name: "Live visualization", status: "done", milestone: "M1b" },
       { id: "F8", name: "Knowledge graph context", status: "planned", milestone: "M3" },
       { id: "F9", name: "Compounding memory", status: "planned", milestone: "M3" },
       { id: "F10", name: "Packs", status: "planned", milestone: "M4" },
@@ -552,6 +552,9 @@
       },
     ],
     changelog: [
+      { date: "2026-07-21", text: "<strong>M1 complete — M1b (dashboard) merged to master.</strong> Final whole-branch review caught and fixed a cross-task integration bug: live SSE events weren't invalidating the query cache driving the run-detail ribbon/gates panel, so scheduler-driven progress (rework, new gates, unit closes) went unreflected in the UI until an unrelated refetch. 72 backend + 28 frontend tests." },
+      { date: "2026-07-21", text: "8-task subagent-driven build: Vite/React/TS/Tailwind scaffold + typed API client → projects page → runs home → pipeline ribbon → gates/artifacts panel → live SSE feed → run detail page + routing + cancel → end-to-end manual verification against the real backend (full plan→approve→implement→reject→rework→approve→cancel cycle driven over HTTP against a live <code>foundry serve</code> + real SSE stream, no browser tool available in this environment)." },
+      { date: "2026-07-21", text: "M1b implementation plan written and approved." },
       { date: "2026-07-21", text: "<strong>M1a (backend: real gates + REST API) merged to master.</strong> Final whole-branch review caught and fixed a derived-gate-rejection wedge and a foundry-serve restart-recovery gap before merge. 72/72 tests." },
       { date: "2026-07-21", text: "10-task subagent-driven build: Store versioning/redaction → real pending gates (removed M0 auto-approve) → ADR-001 envelope/errors → background Scheduler → Projects/Runs/Gates/Cancel/SSE APIs → <code>foundry serve</code>." },
       { date: "2026-07-20", text: "M1a implementation plan written and approved — split M1 into M1a (backend/API) and M1b (dashboard), same pattern as M0's core/driver split." },
