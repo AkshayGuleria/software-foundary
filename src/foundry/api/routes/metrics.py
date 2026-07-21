@@ -23,6 +23,7 @@ async def get_project_metrics(project_id: str, request: Request) -> ApiResponse[
         all_events += await store.list_events(run.id)
         all_gates += await store.list_gates_for_run(run.id)
         all_units += await store.list_units(run.id)
+        all_sessions += await store.list_sessions_for_run(run.id)
         all_artifacts += await store.list_artifacts(run.id)
 
     metrics = compute_project_metrics(

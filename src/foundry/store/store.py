@@ -277,6 +277,17 @@ class Store:
 
         return await self.read(_op)
 
+    async def list_sessions_for_run(self, run_id: str) -> list[SessionRow]:
+        async def _op(session):
+            res = await session.execute(
+                select(SessionRow)
+                .join(WorkUnit, WorkUnit.id == SessionRow.work_unit_id)
+                .where(WorkUnit.run_id == run_id)
+            )
+            return list(res.scalars())
+
+        return await self.read(_op)
+
     # --- events ---
 
     async def append_event(

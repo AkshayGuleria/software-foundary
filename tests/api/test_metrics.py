@@ -62,3 +62,36 @@ async def test_get_metrics_aggregates_across_multiple_runs_in_a_project(api_clie
     # 1 rejected / 2 decided across BOTH runs — only correct if the route sums
     # every run's gates rather than e.g. only the last-created run's.
     assert body["rework_rate"] == pytest.approx(0.5)
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_reflects_crash_count_from_sessions(api_client):
+    """Regression: the route used to hardcode all_sessions = [] (Store had no
+    query to list a run's sessions), so crash_count could never be nonzero
+    even though compute_project_metrics correctly derives it once sessions
+    are actually passed in (proven by its own unit test in
+    tests/metrics/test_rollup.py). Store.list_sessions_for_run plus wiring it
+    into this route closes that gap."""
+    client, store, _scheduler = api_client
+
+    resp = await client.post("/api/projects", json={"name": "demo", "path": "/tmp/demo"})
+    project_id = resp.json()["data"]["id"]
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project_id,
+            "playbook_path": "tests/orchestrator/fixtures/gated_demo.toml",
+            "title": "run",
+        },
+    )
+    run_id = run_resp.json()["data"]["id"]
+
+    units = await store.list_units(run_id)
+    task_unit = next(u for u in units if u.type == "task")
+    session = await store.create_session_row(work_unit_id=task_unit.id, driver="FakeDriver")
+    await store.update_session_row(session.id, status="failed")
+
+    resp = await client.get(f"/api/metrics/{project_id}")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["crash_count"] == 1

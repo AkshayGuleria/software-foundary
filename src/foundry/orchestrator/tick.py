@@ -89,6 +89,13 @@ class Orchestrator:
 
             owner_task = next((u for u in units if u.owner_session_id == unit.id), None)
             await self.store.update_unit(unit.id, status="failed")
+            # Mirror onto the SessionRow audit table too -- a session found
+            # dead here never runs through _collect's own completion path (the
+            # whole point of this branch is that it crashed/vanished instead
+            # of streaming a terminal event), so without this, SessionRow.status
+            # would stay stuck at "running" forever and the metrics rollup's
+            # crash_count would never see this crash.
+            await self.store.update_session_row(unit.id, status="failed")
             if owner_task is None:
                 continue
 
@@ -252,6 +259,24 @@ class Orchestrator:
             )[0]
             await self.store.append_event(run_id, convoy.id, "convoy.created", {"size": len(slices)})
 
+            if not slices:
+                # An empty fan-out array (e.g. an architecture artifact whose
+                # `slices` resolved to []) has no leaf units, so _close_convoys's
+                # `if not leaf_units: continue` guard would otherwise leave this
+                # convoy -- and anything downstream needing it -- open forever
+                # with no error surfaced anywhere. Route it into the same
+                # "failed" terminal state a convoy with a genuinely failed leaf
+                # slice already uses, so it's visible in the event log instead
+                # of silently stalling. The chain/downstream creation below
+                # still runs (harmlessly, producing zero per-slice units) so
+                # downstream steps get materialized against this convoy same
+                # as any other fan-out, consistent with the existing failed-leaf
+                # closing path.
+                await self.store.update_unit(convoy.id, status="failed")
+                await self.store.append_event(
+                    run_id, convoy.id, "convoy.closed", {"status": "failed", "reason": "empty_fan_out"}
+                )
+
             chain = [step] + [s for s in self.playbook.steps if s.fan_out_from == step.id]
             units_by_step_index: dict[str, list[WorkUnit]] = {}
 
@@ -334,12 +359,18 @@ class Orchestrator:
         convoys = [u for u in units if u.type == "convoy" and u.status not in ("closed", "failed")]
         for convoy in convoys:
             step = self._steps_by_id[convoy.step_id]
-            leaf_step_id = step.id
-            for candidate in self.playbook.steps:
-                if candidate.fan_out_from == step.id:
-                    leaf_step_id = candidate.id  # last step in chain wins; one-hop chains only (Task 1)
+            # A convoy can have more than one step chained off it via
+            # fan_out_from (e.g. both "review" and "docs" inheriting from
+            # "implement") -- one-hop chains only (Task 1), but not
+            # necessarily a single branch. Every such step is a leaf the
+            # convoy must wait on; picking just the last one in playbook
+            # order (as an earlier version of this code did) silently
+            # ignored the other branch(es) and let the convoy close (or
+            # never close) based on incomplete information. Falls back to
+            # the fan-out step itself when nothing chains off it.
+            leaf_step_ids = {s.id for s in self.playbook.steps if s.fan_out_from == step.id} or {step.id}
 
-            leaf_units = [u for u in units if u.step_id == leaf_step_id and u.convoy_id == convoy.id]
+            leaf_units = [u for u in units if u.step_id in leaf_step_ids and u.convoy_id == convoy.id]
             if not leaf_units:
                 continue
             if any(u.status == "failed" for u in leaf_units):
@@ -455,7 +486,11 @@ class Orchestrator:
                     await self.store.update_run(run_id, tokens_used=run.tokens_used + total)
 
         await self.store.update_unit(session_unit.id, status="failed" if failed else "closed")
-        await self.store.update_session_row(session_unit.id, status="ended")
+        # SessionRow.status is the metrics rollup's crash-signal source (see
+        # metrics/rollup.py's crash_count) -- it must reflect failed vs. normal
+        # completion, not collapse both into "ended", or crash_count can never
+        # be nonzero even once sessions are wired into the metrics route.
+        await self.store.update_session_row(session_unit.id, status="failed" if failed else "ended")
 
         if failed:
             next_attempt = task_unit.attempt + 1
