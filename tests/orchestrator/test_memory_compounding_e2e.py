@@ -47,6 +47,22 @@ async def test_second_run_context_bundle_includes_lesson_from_first_run(tmp_path
     # Run 2: a similar feature (same project, same playbook, implement again
     # touches auth.py) — its context bundle for the implement dispatch must
     # surface the lesson written by run 1.
+    #
+    # NOTE on *why* this matches: `implement` has no `needs`, so
+    # `_compose_context_bundle`'s query text reduces to just the step_id,
+    # "implement" -- the "touches auth.py" detail above plays no part in the
+    # match (input_files is empty; "auth.py" never enters the query). The
+    # match instead comes entirely from the word "implement" appearing
+    # verbatim in both the query and the lesson's title/body below. This is
+    # `select_relevant_memory`'s keyword-overlap scoring working exactly as
+    # documented (172f7d4: "documented substitute for embedding similarity"),
+    # not semantic understanding -- a lesson worded without the literal word
+    # "implement" (e.g. one that only said "auth.py" and "token expiry")
+    # would score 0 and this test would fail. That fragility is a known
+    # property of the retrieval mechanism this milestone ships, not a defect
+    # in this test; it's called out here so a future wording change to the
+    # fixture lesson below doesn't accidentally break the cross-run proof for
+    # a reason that looks unrelated.
     run2 = await store.create_run(project.id, "compounding_demo.toml", "run 2")
     await materialize(playbook, run2.id, store)
     driver2 = FakeDriver(
