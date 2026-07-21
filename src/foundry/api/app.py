@@ -9,6 +9,7 @@ from foundry.api.errors import (
     request_validation_error_handler,
 )
 from foundry.api.routes.gates import router as gates_router
+from foundry.api.routes.knowledge import router as knowledge_router
 from foundry.api.routes.memory import router as memory_router
 from foundry.api.routes.metrics import router as metrics_router
 from foundry.api.routes.projects import router as projects_router
@@ -34,6 +35,7 @@ def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
     app.include_router(metrics_router, prefix="/api")
     app.include_router(sessions_router, prefix="/api")
     app.include_router(memory_router, prefix="/api")
+    app.include_router(knowledge_router, prefix="/api")
 
     @app.get("/api/_health")
     async def health() -> dict:
