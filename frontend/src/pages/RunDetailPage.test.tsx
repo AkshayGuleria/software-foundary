@@ -49,6 +49,9 @@ describe("RunDetailPage", () => {
       if (url.startsWith("/api/runs/01JR1/artifacts")) {
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
       }
+      if (url === "/api/runs/01JR1/graph") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { units: [], deps: [] }, paging: {} }) });
+      }
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
     });
 
@@ -75,6 +78,9 @@ describe("RunDetailPage", () => {
             paging: {},
           }),
         });
+      }
+      if (url === "/api/runs/01JR1/graph") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { units: [], deps: [] }, paging: {} }) });
       }
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
     });
