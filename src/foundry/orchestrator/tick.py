@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from foundry.drivers.base import AgentDriver, SessionSpec
-from foundry.playbook.schema import PlaybookSpec, StepSpec
-from foundry.store.models import Gate, WorkUnit
+from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
+from foundry.store.models import Artifact, Gate, UnitDep, WorkUnit
 from foundry.store.store import Store
 
 
@@ -14,6 +14,17 @@ class TickResult:
     closed: int
     failed: int
     complete: bool = True
+
+
+def _resolve_fan_out_slices(artifacts: list[Artifact], kind: str, field: str) -> list:
+    matching = [a for a in artifacts if a.kind == kind]
+    if not matching:
+        raise ValueError(f"fan-out: no artifact of kind {kind!r} found yet")
+    latest = max(matching, key=lambda a: a.version)
+    value = latest.payload_json.get(field)
+    if not isinstance(value, list):
+        raise ValueError(f"fan-out source {kind}.{field} is not a list (got {type(value).__name__})")
+    return value
 
 
 class Orchestrator:
@@ -29,6 +40,8 @@ class Orchestrator:
         await self.apply_gate_decisions(run_id)
         await self.unblock(run_id)
         await self._gate_derived_units(run_id)
+        await self._fan_out(run_id)
+        await self._close_convoys(run_id)
         dispatched = await self.dispatch(run_id)
 
         units = await self.store.list_units(run_id)
@@ -188,6 +201,124 @@ class Orchestrator:
             await self.store.create_gate(work_unit_id=unit.id, gate_type="derived", decision="pending")
             await self.store.update_unit(unit.id, status="blocked")
             await self.store.append_event(run_id, unit.id, "gate.created", {"gate_type": "derived"})
+
+    async def _fan_out(self, run_id: str) -> None:
+        units = await self.store.list_units(run_id)
+        static_unit_by_step = {u.step_id: u for u in units if u.convoy_id is None and u.type != "convoy"}
+        expanded_steps = {u.step_id for u in units if u.type == "convoy"}
+
+        for step in self.playbook.steps:
+            if not step.fan_out or step.id in expanded_steps:
+                continue
+            need_units = [static_unit_by_step.get(n) for n in step.needs]
+            if any(u is None or u.status != "closed" for u in need_units):
+                continue
+
+            artifacts = await self.store.list_artifacts(run_id)
+            kind, _, field = step.fan_out.partition(".")
+            slices = _resolve_fan_out_slices(artifacts, kind, field)
+
+            convoy = (
+                await self.store.create_work_units(
+                    [WorkUnit(run_id=run_id, step_id=step.id, type="convoy", status="open")]
+                )
+            )[0]
+            await self.store.append_event(run_id, convoy.id, "convoy.created", {"size": len(slices)})
+
+            chain = [step] + [s for s in self.playbook.steps if s.fan_out_from == step.id]
+            units_by_step_index: dict[str, list[WorkUnit]] = {}
+
+            for chain_step in chain:
+                payloads = [
+                    {"slice_index": i, "slice": slices[i]} if chain_step is step else {"slice_index": i}
+                    for i in range(len(slices))
+                ]
+                max_attempts = chain_step.loop.max_rounds if chain_step.loop else 3
+                new_units = await self.store.create_work_units(
+                    [
+                        WorkUnit(
+                            run_id=run_id,
+                            step_id=chain_step.id,
+                            type=STEP_TYPE_TO_UNIT_TYPE[chain_step.type],
+                            status="open",
+                            convoy_id=convoy.id,
+                            payload_json=payloads[i],
+                            max_attempts=max_attempts,
+                        )
+                        for i in range(len(slices))
+                    ]
+                )
+                deps: list[UnitDep] = []
+                if chain_step is step:
+                    for unit in new_units:
+                        for need_id in chain_step.needs:
+                            deps.append(
+                                UnitDep(
+                                    unit_id=unit.id,
+                                    needs_unit_id=need_units[chain_step.needs.index(need_id)].id,
+                                )
+                            )
+                else:
+                    source_units = units_by_step_index[chain_step.fan_out_from]
+                    for i, unit in enumerate(new_units):
+                        deps.append(UnitDep(unit_id=unit.id, needs_unit_id=source_units[i].id))
+                if deps:
+                    await self.store.add_unit_deps(deps)
+                units_by_step_index[chain_step.id] = new_units
+                await self.store.append_event(
+                    run_id, convoy.id, "unit.created", {"step_id": chain_step.id, "count": len(new_units)}
+                )
+
+            chain_ids = {s.id for s in chain}
+            already_materialized = {u.step_id for u in units if u.convoy_id is None and u.type != "convoy"}
+            downstream = [
+                s
+                for s in self.playbook.steps
+                if s.id not in chain_ids
+                and s.id not in already_materialized
+                and any(n in chain_ids for n in s.needs)
+            ]
+            for ds_step in downstream:
+                ds_unit = (
+                    await self.store.create_work_units(
+                        [
+                            WorkUnit(
+                                run_id=run_id,
+                                step_id=ds_step.id,
+                                type=STEP_TYPE_TO_UNIT_TYPE[ds_step.type],
+                                status="open",
+                            )
+                        ]
+                    )
+                )[0]
+                dep_rows = [UnitDep(unit_id=ds_unit.id, needs_unit_id=convoy.id)]
+                for need_id in ds_step.needs:
+                    if need_id in chain_ids:
+                        continue
+                    other = static_unit_by_step.get(need_id)
+                    if other is not None:
+                        dep_rows.append(UnitDep(unit_id=ds_unit.id, needs_unit_id=other.id))
+                await self.store.add_unit_deps(dep_rows)
+
+    async def _close_convoys(self, run_id: str) -> None:
+        units = await self.store.list_units(run_id)
+        convoys = [u for u in units if u.type == "convoy" and u.status not in ("closed", "failed")]
+        for convoy in convoys:
+            step = self._steps_by_id[convoy.step_id]
+            leaf_step_id = step.id
+            for candidate in self.playbook.steps:
+                if candidate.fan_out_from == step.id:
+                    leaf_step_id = candidate.id  # last step in chain wins; one-hop chains only (Task 1)
+
+            leaf_units = [u for u in units if u.step_id == leaf_step_id and u.convoy_id == convoy.id]
+            if not leaf_units:
+                continue
+            if any(u.status == "failed" for u in leaf_units):
+                await self.store.update_unit(convoy.id, status="failed")
+                await self.store.append_event(run_id, convoy.id, "convoy.closed", {"status": "failed"})
+            elif all(u.status == "closed" for u in leaf_units):
+                await self.store.update_unit(convoy.id, status="closed")
+                await self.store.append_event(run_id, convoy.id, "convoy.closed", {"status": "closed"})
 
     async def dispatch(self, run_id: str) -> int:
         units = await self.store.list_units(run_id)
