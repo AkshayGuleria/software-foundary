@@ -96,6 +96,46 @@ async def test_crash_mid_session_recovers_on_restart_with_no_duplicate_artifacts
 
 
 @pytest.mark.asyncio
+async def test_reconcile_marks_the_crashed_session_row_failed_not_just_the_unit(tmp_path):
+    # Regression: reconcile()'s dead-session branch used to update only the
+    # session WorkUnit's status to "failed", never the parallel SessionRow
+    # audit row (dispatch() creates one alongside every session unit) --
+    # SessionRow.status stayed stuck at "running" forever for a genuinely
+    # crashed session. metrics/rollup.py's crash_count filters SessionRow by
+    # status == "failed", so a real crash was invisible to that metric even
+    # though the session WorkUnit correctly recorded the failure.
+    store = await make_store(tmp_path)
+    project = await store.create_project("demo2b", str(tmp_path))
+    playbook = load_playbook(FIXTURE)
+    run = await store.create_run(project.id, FIXTURE, "demo run 2b")
+    await materialize(playbook, run.id, store)
+
+    slow_script = {
+        "plan": FakeStepScript(artifact={"steps": ["a"]}),
+        "implement": FakeStepScript(artifact={"diff": "..."}, mode="delay", delay_s=5.0),
+        "review": FakeStepScript(artifact={"verdict": "ok"}),
+    }
+    orch1 = Orchestrator(store, FakeDriver(slow_script), playbook)
+    await orch1.tick(run.id)  # closes "plan"
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(orch1.tick(run.id), timeout=0.05)  # "kill -9" mid-"implement" session
+
+    units = await store.list_units(run.id)
+    implement_session = next(u for u in units if u.type == "session" and u.step_id == "implement")
+    session_row_before = await store.get_session_row(implement_session.id)
+    assert session_row_before.status == "running"
+
+    fast_script = {**slow_script, "implement": FakeStepScript(artifact={"diff": "..."})}
+    fresh_orch = Orchestrator(store, FakeDriver(fast_script), playbook)  # fresh driver: adopt() -> []
+    await fresh_orch.tick(run.id)  # reconcile() discovers the dead session
+
+    session_row_after = await store.get_session_row(implement_session.id)
+    assert session_row_after.status == "failed"
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_failed_session_retries_then_blocks_after_max_attempts(tmp_path):
     store = await make_store(tmp_path)
     project = await store.create_project("demo3", str(tmp_path))
