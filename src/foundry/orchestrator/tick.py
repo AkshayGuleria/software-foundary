@@ -55,6 +55,7 @@ class Orchestrator:
         await self._fan_out(run_id)
         await self._close_convoys(run_id)
         dispatched = await self.dispatch(run_id)
+        await self._dispatch_agent_reviews(run_id)
 
         units = await self.store.list_units(run_id)
         closed = sum(1 for u in units if u.status == "closed" and u.type == "task")
@@ -495,6 +496,95 @@ class Orchestrator:
             # Store.decide_gate — apply_gate_decisions() picks it up next tick.
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})
+
+    async def _dispatch_agent_reviews(self, run_id: str) -> None:
+        gates = await self.store.list_gates_for_run(run_id)
+        events = await self.store.list_events(run_id)
+        already_reviewed_gate_ids = {
+            e.payload_json.get("gate_id") for e in events if e.type == "gate.review_dispatched"
+        }
+
+        for gate in gates:
+            if gate.gate_type != "agent" or gate.decision != "pending":
+                continue
+            if gate.id in already_reviewed_gate_ids:
+                continue
+
+            unit = await self.store.get_unit(gate.work_unit_id)
+            if unit is None:
+                continue
+            step = self._steps_by_id[unit.step_id]
+
+            spec = SessionSpec(
+                cwd=".",
+                prompt=f"review:{step.id}:gate:{gate.id}",
+                model="fake",
+                tool_policy={},
+                mcp_servers=[],
+                env={},
+                internal_endpoint="",
+                internal_secret="",
+                unit_id=gate.id,
+                run_id=run_id,
+                step_id=step.id,
+            )
+            handle = self.driver.spawn(spec)
+            await self.store.append_event(run_id, unit.id, "gate.review_dispatched", {"gate_id": gate.id})
+
+            verdict = "needs_changes"
+            async for ev in self.driver.stream_events(handle):
+                await self.store.append_event(run_id, unit.id, f"driver.{ev.kind}", ev.payload)
+                if ev.kind == "completed":
+                    verdict = ev.payload.get("artifact", {}).get("verdict", "needs_changes")
+
+            decision = "approved" if verdict == "approved" else "rejected"
+            await self.store.decide_gate(gate.id, decision, feedback={"verdict": verdict}, decided_by="agent")
+
+            # apply_gate_decisions() only ever reopens the unit a gate is attached
+            # to -- here, the review task itself, since that's whose artifact the
+            # gate was created against in _collect(). But a rejected review verdict
+            # is a judgment on the *upstream* artifact the review step evaluated,
+            # not on the review step's own work; reopening only the review task
+            # would just re-run the review against the same stale artifact forever
+            # and never touch the step that actually needs rework. loop.back_to
+            # names that upstream step, so it's reopened directly here -- with the
+            # same attempt-vs-max_attempts cap-and-escalate idiom _collect's
+            # driver-failure path already uses (blocked + human gate once the cap
+            # is hit) -- so the loop is guaranteed to terminate in a human gate
+            # instead of cycling indefinitely. This is additive to, not a
+            # replacement for, apply_gate_decisions's existing handling of the
+            # review gate itself, which runs unchanged on the next tick.
+            if decision == "rejected" and step.loop is not None:
+                units = await self.store.list_units(run_id)
+                back_to_unit = next(
+                    (u for u in units if u.step_id == step.loop.back_to and u.convoy_id == unit.convoy_id),
+                    None,
+                )
+                # Skip if already escalated to a human gate from a prior round --
+                # without this, every subsequent rejected review round (the review
+                # task keeps re-dispatching independently of the now-blocked
+                # upstream unit) would create another duplicate human gate.
+                if back_to_unit is not None and back_to_unit.status != "blocked":
+                    next_attempt = back_to_unit.attempt + 1
+                    if next_attempt >= back_to_unit.max_attempts:
+                        await self.store.update_unit(back_to_unit.id, status="blocked", attempt=next_attempt)
+                        await self.store.create_gate(
+                            work_unit_id=back_to_unit.id, gate_type="human", decision="pending"
+                        )
+                        await self.store.append_event(
+                            run_id,
+                            back_to_unit.id,
+                            "unit.blocked",
+                            {"reason": "review_max_rounds", "gate_id": gate.id},
+                        )
+                    else:
+                        await self.store.update_unit(back_to_unit.id, status="ready", attempt=next_attempt)
+                        await self.store.append_event(
+                            run_id,
+                            back_to_unit.id,
+                            "unit.retried",
+                            {"attempt": next_attempt, "reason": "review_rejected", "gate_id": gate.id},
+                        )
 
     def _cleanup_worktree(self, unit_id: str) -> None:
         path = self._unit_worktrees.pop(unit_id, None)
