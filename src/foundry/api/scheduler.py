@@ -12,11 +12,22 @@ from foundry.store.store import Store
 class GlobalDispatchLimiter:
     """Cross-run / cross-project fairness gate.
 
-    Tracks in-flight dispatch slots so one project's fan-out convoy (many
-    concurrently-registered runs) can't starve every other project's runs of
-    tick time, and so no single tick_all_once pass over-dispatches globally.
-    Purely in-memory bookkeeping — no store access, no async — so it's testable
-    in complete isolation from Scheduler/Orchestrator.
+    Tracks in-flight dispatch slots so a future concurrent scheduler (multiple
+    `Orchestrator.tick()` calls genuinely overlapping) can't let one project's
+    fan-out convoy starve or overload another project. Purely in-memory
+    bookkeeping — no store access, no async — so it's testable in complete
+    isolation from Scheduler/Orchestrator.
+
+    Caveat: `Scheduler.tick_all_once` currently ticks registered runs strictly
+    sequentially and `record_dispatch`/`release` bracket one whole `tick()`
+    call each, with `release` firing before the next run's `can_dispatch`
+    check runs. Under that (current) execution model, `_in_flight_total` and
+    `_in_flight_by_project` never actually accumulate above 1, so `can_dispatch`
+    will not return False at any non-zero cap — the caps only become a real
+    concurrency ceiling once ticks can genuinely overlap. What *is* effective
+    today is `_fairness_order`'s use of `_last_ticked_seq`: it still gives
+    least-recently-ticked-project priority each pass, which is the fairness
+    half of this task's exit criterion.
     """
 
     def __init__(self, global_cap: int = 20, per_project_cap: int = 8):
