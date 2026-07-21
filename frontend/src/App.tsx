@@ -1,11 +1,29 @@
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import ProjectsPage from "./pages/ProjectsPage";
+import RunDetailPage from "./pages/RunDetailPage";
+import RunsHomePage from "./pages/RunsHomePage";
+
 export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 px-6 py-4">
+      <header className="flex items-center gap-4 border-b border-slate-800 px-6 py-4">
         <h1 className="text-lg font-semibold">Foundry</h1>
+        <nav className="flex gap-3 text-sm">
+          <NavLink to="/projects" className="text-slate-400 hover:text-orange-400">
+            Projects
+          </NavLink>
+          <NavLink to="/runs" className="text-slate-400 hover:text-orange-400">
+            Runs
+          </NavLink>
+        </nav>
       </header>
       <main className="p-6">
-        <p className="text-slate-400">Dashboard scaffold — routes land in later tasks.</p>
+        <Routes>
+          <Route path="/" element={<Navigate to="/runs" replace />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/runs" element={<RunsHomePage />} />
+          <Route path="/runs/:id" element={<RunDetailPage />} />
+        </Routes>
       </main>
     </div>
   );
