@@ -68,7 +68,13 @@ async def test_crash_mid_session_recovers_on_restart_with_no_duplicate_artifacts
     await orch1.tick(run.id)  # closes "plan"
 
     with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(orch1.tick(run.id), timeout=0.05)  # "kill -9" mid-"implement" session
+        # 0.5s budget vs. the 5.0s FakeDriver delay: wide margin so this stays
+        # deterministic under full-suite load. M3a's dispatch() now does several
+        # extra store round-trips per unit (_compose_context_bundle) before a
+        # task is marked in_progress, which made the previous 0.05s budget tight
+        # enough to flake in a full-suite run (observed during M3a's final
+        # whole-branch review).
+        await asyncio.wait_for(orch1.tick(run.id), timeout=0.5)  # "kill -9" mid-"implement" session
 
     units = await store.list_units(run.id)
     implement_task = next(u for u in units if u.step_id == "implement" and u.type == "task")
@@ -118,7 +124,8 @@ async def test_reconcile_marks_the_crashed_session_row_failed_not_just_the_unit(
     orch1 = Orchestrator(store, FakeDriver(slow_script), playbook)
     await orch1.tick(run.id)  # closes "plan"
     with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(orch1.tick(run.id), timeout=0.05)  # "kill -9" mid-"implement" session
+        # See the sibling test above for why this is 0.5s, not 0.05s.
+        await asyncio.wait_for(orch1.tick(run.id), timeout=0.5)  # "kill -9" mid-"implement" session
 
     units = await store.list_units(run.id)
     implement_session = next(u for u in units if u.type == "session" and u.step_id == "implement")
