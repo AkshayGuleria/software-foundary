@@ -85,7 +85,7 @@ class CodexDriver:
                 os.killpg(pgid, signal.SIGTERM)
             else:
                 process.terminate()
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             return
 
     def adopt(self) -> list[SessionHandle]:
@@ -115,22 +115,31 @@ class CodexDriver:
         pgid = self._pgids.get(unit_id)
         if pgid is None:
             return
+        # Every killpg below must also treat PermissionError as "stop, nothing more
+        # to do here" — not just ProcessLookupError. Once our own leader pid has been
+        # reaped (which, per the comment above, has always already happened by the
+        # time we get here), the OS is free to recycle that exact pid/pgid number for
+        # an unrelated process group under high subprocess churn (observed in this
+        # repo's own test suite). Signaling a recycled pgid we don't own raises
+        # PermissionError rather than ProcessLookupError, and it would be both wrong
+        # (we're no longer touching our own descendants) and dangerous (crashing this
+        # cleanup path back into the driver) to let that propagate.
         try:
             os.killpg(pgid, signal.SIGTERM)
-        except ProcessLookupError:
-            return  # process group already empty — nothing left to clean up
+        except (ProcessLookupError, PermissionError):
+            return  # process group already empty (or no longer ours) — nothing to clean up
 
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             try:
                 os.killpg(pgid, 0)  # signal 0: probe liveness without disturbing the group
-            except ProcessLookupError:
-                return  # group exited within the grace period
+            except (ProcessLookupError, PermissionError):
+                return  # group exited within the grace period (or pgid was recycled)
             time.sleep(0.05)
 
         try:
             os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             pass
 
 
