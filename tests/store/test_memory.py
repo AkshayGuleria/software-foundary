@@ -45,11 +45,28 @@ async def test_list_memory_items_filters_by_project(tmp_path):
 @pytest.mark.asyncio
 async def test_list_memory_items_filters_by_kind_and_scope(tmp_path):
     store = await _store(tmp_path)
-    await store.create_memory_item(scope="project", kind="lesson", title="L", body_md="x", project_id="p1")
+    # Same project_id and kind across scopes, so project_id/kind alone can't
+    # discriminate — only genuine AND-combination with scope narrows to "P".
+    await store.create_memory_item(scope="role", kind="pattern", title="R", body_md="x", project_id="p1")
     await store.create_memory_item(scope="project", kind="pattern", title="P", body_md="x", project_id="p1")
 
-    items = await store.list_memory_items(project_id="p1", kind="pattern")
+    items = await store.list_memory_items(project_id="p1", kind="pattern", scope="project")
     assert [i.title for i in items] == ["P"]
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_list_memory_items_filters_by_scope_alone(tmp_path):
+    store = await _store(tmp_path)
+    await store.create_memory_item(
+        scope="pack", kind="pattern", title="Pack item", body_md="x", pack_id="pk1"
+    )
+    await store.create_memory_item(
+        scope="project", kind="pattern", title="Project item", body_md="x", project_id="p1"
+    )
+
+    items = await store.list_memory_items(scope="pack")
+    assert [i.title for i in items] == ["Pack item"]
     await store.stop()
 
 
