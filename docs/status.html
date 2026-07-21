@@ -479,9 +479,9 @@
   // ---- Data model. Edit this block as implementation progresses, then re-render. ----
   const DATA = {
     stats: [
-      { label: "Milestones shipped", value: "2 / 6", accent: false },
-      { label: "Tests passing", value: "123 / 123", done: true },
-      { label: "Requirements met", value: "5 / 11", accent: false },
+      { label: "Milestones shipped", value: "3 / 6", accent: false },
+      { label: "Tests passing", value: "125 / 125 + 36 / 36", done: true },
+      { label: "Requirements met", value: "7 / 11", accent: false },
       { label: "ADRs accepted", value: "1", accent: false },
     ],
     milestones: [
@@ -502,10 +502,10 @@
         ],
       },
       {
-        id: "M2", name: "Fan-out + review loop + second provider", duration: "3 weeks", status: "active",
-        scope: "<strong>M2a (engine, shipped):</strong> dynamic convoy/<code>fan_out</code> expansion at tick-time; per‑unit git worktrees; generic <code>escalates_on</code> contract (the <code>integrate</code> step's human-handoff mechanism, engine-agnostic to SDLC semantics); agent‑review loop with round cap; CodexDriver (protocol-conformant, scripted-fixture tested); token budgets + cross‑project fair dispatch; compute-on-read metrics rollup + <code>/api/metrics</code>. <strong>M2b (dashboard, not started):</strong> fleet view, DAG view, metrics view.",
+        id: "M2", name: "Fan-out + review loop + second provider", duration: "3 weeks", status: "done",
+        scope: "<strong>M2a (engine):</strong> dynamic convoy/<code>fan_out</code> expansion at tick-time; per‑unit git worktrees; generic <code>escalates_on</code> contract (the <code>integrate</code> step's human-handoff mechanism, engine-agnostic to SDLC semantics); agent‑review loop with round cap; CodexDriver (protocol-conformant, scripted-fixture tested); token budgets + cross‑project fair dispatch; compute-on-read metrics rollup + <code>/api/metrics</code>. <strong>M2b (dashboard):</strong> <code>convoy_id</code> + <code>GET /api/sessions</code>; DAG view (deterministic layered SVG, convoy grouping) on run detail; fleet view (active sessions across all runs); project metrics summary panel. <em>Known follow-up:</em> <code>Scheduler.register()</code> doesn't yet wire <code>WorktreeManager</code> through to <code>Orchestrator</code>, so no production entry point (serve/run/API) currently engages per-unit worktree isolation — the mechanism is built and tested (M2a) but not live-wired; needs its own TDD pass on the failure-mode design, not a quick patch.",
         criteria: [
-          { met: true, text: "3‑slice feature implemented by parallel agents (mixed providers), peer‑reviewed, integrated to one branch with ≥1 auto‑resolved conflict — proven end‑to‑end on FakeDriver (M2a); 'visualized live' still needs M2b's DAG view" },
+          { met: true, text: "3‑slice feature implemented by parallel agents (mixed providers), peer‑reviewed, integrated to one branch with ≥1 auto‑resolved conflict, visualized on the DAG — proven end‑to‑end (FakeDriver for orchestration correctness, real HTTP + source-level verification for the dashboard surfaces; no browser automation available in this environment for the literal pixel-rendered check, same accepted limitation carried since M1b)" },
         ],
       },
       {
@@ -539,7 +539,7 @@
       { id: "F4", name: "Parallel fan-out", status: "done", milestone: "M2a" },
       { id: "F5", name: "Provider-agnostic agents", status: "done", milestone: "M0/M2a" },
       { id: "F6", name: "Durable work + crash recovery", status: "done", milestone: "M0" },
-      { id: "F7", name: "Live visualization", status: "done", milestone: "M1b" },
+      { id: "F7", name: "Live visualization", status: "done", milestone: "M1b/M2b" },
       { id: "F8", name: "Knowledge graph context", status: "planned", milestone: "M3" },
       { id: "F9", name: "Compounding memory", status: "planned", milestone: "M3" },
       { id: "F10", name: "Packs", status: "planned", milestone: "M4" },
@@ -552,6 +552,9 @@
       },
     ],
     changelog: [
+      { date: "2026-07-21", text: "<strong>M2 complete — M2b (DAG view, fleet view, metrics) merged to master.</strong> 5 of 6 per-task reviews found zero issues; final whole-branch review confirmed the M2 exit criterion is genuinely met end-to-end and flagged one real cross-milestone follow-up rather than blind-fixing it: <code>Scheduler.register()</code> never wires <code>WorktreeManager</code> through to <code>Orchestrator</code>, so no production entry point (serve/run/API) currently engages the per-unit worktree isolation M2a built and tested — closing it properly needs its own TDD pass on the failure-mode design (what happens when a project path isn't a real git repo), not a review-round patch. 125 backend + 36 frontend tests." },
+      { date: "2026-07-21", text: "6-task subagent-driven build: backend (<code>convoy_id</code> on work units + <code>GET /api/sessions</code>) → frontend types/API client → DAG view panel (deterministic layered SVG, convoy grouping, wired into the existing SSE-cache-invalidation effect) → fleet view (active sessions across all runs, polled) → project metrics summary panel on runs home → end-to-end manual verification against a real running backend using the M2a exit-criterion fixture (no browser automation available in this environment, same substitution pattern M1b's own end-to-end task established: direct HTTP + Vite-proxy verification instead)." },
+      { date: "2026-07-21", text: "M2b implementation plan written and approved." },
       { date: "2026-07-21", text: "<strong>M2a (fan-out engine backend) merged to master.</strong> Per-task review found and fixed 7 real bugs across the milestone (a fan-out readiness-gate bypass by shadowed session units, a GIT_DIR environment leak into throwaway test repos, a fan-out slice-mismatch and a wrong round-cap source in the agent-review loop, a dead process-reap path and a pgid-recycling crash in CodexDriver, a macOS symlink path bug in worktree branch cleanup). Final whole-branch review found and fixed 3 more cross-task gaps: an empty-fan-out convoy that stalled forever with no error, <code>_close_convoys</code> only tracking the last of multiple <code>fan_out_from</code> branches off one convoy, and <code>crash_count</code> being unreachable end-to-end (no store query existed to list sessions, and <code>SessionRow.status</code> was never actually set to failed anywhere). 123/123 tests." },
       { date: "2026-07-21", text: "10-task subagent-driven build: playbook schema (<code>fan_out</code>/<code>fan_out_from</code>/<code>loop</code>/<code>escalates_on</code>) → materializer static/dynamic split → orchestrator fan-out expansion + convoy closing → per-unit git worktrees → escalation contract → agent-review loop → CodexDriver → concurrency caps + token budgets → metrics rollup → end-to-end exit-criterion proof (3-slice fan-out, mixed simulated providers, real reject→rework cycle, integrate with escalation, all on FakeDriver per the project's FakeDriver-first mandate — no real network calls, no real CLI invocation)." },
       { date: "2026-07-21", text: "M2a implementation plan written and approved — split M2 into M2a (engine backend) and M2b (dashboard: fleet/DAG/metrics views), same pattern as M1's a/b split." },
