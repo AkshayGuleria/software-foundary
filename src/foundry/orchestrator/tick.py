@@ -59,6 +59,7 @@ class Orchestrator:
         await self._gate_derived_units(run_id)
         await self._fan_out(run_id)
         await self._close_convoys(run_id)
+        await self._check_convoy_interference(run_id)
         dispatched = await self.dispatch(run_id)
         await self._dispatch_agent_reviews(run_id)
 
@@ -383,6 +384,68 @@ class Orchestrator:
             elif all(u.status == "closed" for u in leaf_units):
                 await self.store.update_unit(convoy.id, status="closed")
                 await self.store.append_event(run_id, convoy.id, "convoy.closed", {"status": "closed"})
+
+    async def _check_convoy_interference(self, run_id: str) -> None:
+        # Cross-slice interference warning (M3a Task 6): within a fan-out convoy,
+        # two sibling slices can independently touch files that are far apart in
+        # the diff but close in the dependency graph (e.g. both importing a shared
+        # module) -- exactly the kind of collision blast_radius (Task 1) already
+        # detects for a single change, applied here pairwise across slices. This
+        # is advisory only (an event, not a gate): the engine has no opinion on
+        # whether the overlap is actually a problem, only that it's worth a human
+        # noticing before the convoy's downstream steps proceed.
+        if self.kg_snapshot is None:
+            return
+
+        units = await self.store.list_units(run_id)
+        convoys = [u for u in units if u.type == "convoy"]
+        events = await self.store.list_events(run_id)
+        # Idempotent per convoy, same dedup-via-events-scan idiom as
+        # _dispatch_agent_reviews's already_reviewed_gate_ids and dispatch()'s
+        # budget.exceeded/budget.warning checks -- without it, a warning would
+        # re-fire every tick for as long as the convoy stays open.
+        already_warned = {
+            e.payload_json.get("convoy_id") for e in events if e.type == "convoy.interference_warning"
+        }
+        artifacts = await self.store.list_artifacts(run_id)
+        artifacts_by_unit: dict[str, list[Artifact]] = {}
+        for a in artifacts:
+            artifacts_by_unit.setdefault(a.work_unit_id, []).append(a)
+
+        for convoy in convoys:
+            if convoy.id in already_warned:
+                continue
+            slice_units = [u for u in units if u.convoy_id == convoy.id and u.type == "task"]
+            slice_radii: dict[str, set[str]] = {}
+            for slice_unit in slice_units:
+                slice_artifacts = artifacts_by_unit.get(slice_unit.id, [])
+                files: list[str] = []
+                for a in slice_artifacts:
+                    files.extend(a.payload_json.get("files", []))
+                if files:
+                    slice_radii[slice_unit.id] = blast_radius(self.kg_snapshot, files)
+
+            overlaps: list[list[str]] = []
+            overlapping_files: set[str] = set()
+            slice_ids = list(slice_radii.keys())
+            for i in range(len(slice_ids)):
+                for j in range(i + 1, len(slice_ids)):
+                    shared = slice_radii[slice_ids[i]] & slice_radii[slice_ids[j]]
+                    if shared:
+                        overlaps.append([slice_ids[i], slice_ids[j]])
+                        overlapping_files |= shared
+
+            if overlaps:
+                await self.store.append_event(
+                    run_id,
+                    convoy.id,
+                    "convoy.interference_warning",
+                    {
+                        "convoy_id": convoy.id,
+                        "overlapping_slices": overlaps,
+                        "overlapping_files": sorted(overlapping_files),
+                    },
+                )
 
     async def _compose_context_bundle(
         self, run_id: str, task_unit: WorkUnit
