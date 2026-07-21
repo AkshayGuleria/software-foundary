@@ -9,21 +9,23 @@ Design doc: [`docs/software-foundary-design.md`](docs/software-foundary-design.m
 
 ## Status
 
-**M0 (durable core): shipped.** Store schema, TOML playbook parser + plan-first
-lint, DAG materializer, orchestrator tick loop (reconcile/unblock/dispatch/
-retry) with proven crash recovery, a deterministic `FakeDriver`, and a CLI —
-all tested (28 passing) against `FakeDriver`, no tokens spent. Implementation
-plan: [`docs/superpowers/plans/2026-07-20-m0-durable-core.md`](docs/superpowers/plans/2026-07-20-m0-durable-core.md).
+**M0-M2 shipped, M3 (knowledge graph + memory) in progress.** Durable store +
+orchestrator + plan-first lint (M0); real gates with reject/rework + REST API
++ React/Vite dashboard (M1); fan-out/convoys, per-unit git worktrees,
+agent-review loop, second driver, token budgets, metrics (M2). All backed by
+a deterministic `FakeDriver` in CI — no tokens spent. See
+[`docs/status.html`](docs/status.html) for the live build-status tracker and
+`docs/superpowers/plans/` for each milestone's implementation plan.
 
-Not yet built: real agent driver (`ClaudeCodeDriver`) + `/internal` API,
-fan-out/parallel slices, dashboard, knowledge graph, memory/packs. See the
-design doc's roadmap (§15) for the full milestone sequence.
+Not yet built: real agent driver (`ClaudeCodeDriver`) wired end-to-end,
+packs, portfolio view, multi-user/Postgres. See the design doc's roadmap
+(§15) for the full milestone sequence.
 
 ## Stack
 
-Python 3.12+, SQLAlchemy 2 (async) + aiosqlite (WAL), Pydantic v2, Typer,
-pytest + pytest-asyncio. FastAPI/Alembic are dependencies for milestones not
-yet built. Dashboard (from M1): React/Vite/TS/Tailwind.
+Backend: Python 3.12+, SQLAlchemy 2 (async) + aiosqlite (WAL), Pydantic v2,
+FastAPI, Typer, pytest + pytest-asyncio. Frontend: React 18, Vite 5,
+TypeScript 5, Tailwind CSS, TanStack Query, Vitest.
 
 ## Project layout
 
@@ -31,9 +33,13 @@ yet built. Dashboard (from M1): React/Vite/TS/Tailwind.
 src/foundry/
   store/        SQLAlchemy models, WAL-mode engine, single-writer Store
   playbook/     TOML schema, loader (+ plan-first lint), DAG materializer
-  drivers/      AgentDriver protocol, FakeDriver
-  orchestrator/ tick loop: reconcile -> unblock -> dispatch -> collect -> retry
-  cli.py        `foundry run`, `foundry events`
+  drivers/      AgentDriver protocol, FakeDriver, CodexDriver
+  orchestrator/ tick loop: reconcile -> unblock -> fan-out -> dispatch -> collect -> retry
+  kg/           import-graph service + memory retrieval (M3)
+  metrics/      compute-on-read rollup
+  api/          FastAPI app, REST routes, SSE stream, scheduler
+  cli.py        `foundry run`, `foundry events`, `foundry serve`
+frontend/       React/Vite/TS dashboard (projects, runs, DAG/fleet/metrics views)
 packs/default/  built-in SDLC playbook (not yet wired to a role/prompt system)
 ```
 
@@ -42,9 +48,51 @@ packs/default/  built-in SDLC playbook (not yet wired to a role/prompt system)
 ```bash
 uv sync
 uv run pytest -v
+
+cd frontend
+npm install
+npm test
 ```
 
-## Try it
+## Run the app (frontend + backend, dev env)
+
+Two processes, two terminals — the frontend dev server proxies `/api` calls
+to the backend.
+
+**Terminal 1 — backend:**
+
+```bash
+uv run foundry serve --db /tmp/foundry.db --port 8000
+```
+
+Starts the FastAPI app + background scheduler at `http://localhost:8000`.
+`--db` points at a SQLite file (created if it doesn't exist); use a fresh
+path for a clean slate.
+
+**Terminal 2 — frontend:**
+
+```bash
+cd frontend
+npm install   # first time only
+npm run dev
+```
+
+Vite prints a local URL (typically `http://localhost:5173`). Open it in a
+browser — its dev server proxies `/api/*` to the backend on `:8000`
+(configured in `frontend/vite.config.ts`), so both must be running together.
+
+From there: create a project on the **Projects** page, start a run on
+**Runs** against a playbook file (e.g.
+`tests/orchestrator/fixtures/fanout_e2e.toml` for a full fan-out/review/
+integrate demo), then open the run's detail page for the pipeline ribbon,
+DAG view, gates/artifacts panel, and live event feed. **Fleet** shows active
+sessions across all runs.
+
+No real LLM calls happen in this mode — every run in this environment executes
+on `FakeDriver` (scripted, deterministic, zero tokens) unless a real driver is
+explicitly wired in, which hasn't shipped yet.
+
+## Try it (CLI only, no browser)
 
 Run a playbook end-to-end against `FakeDriver` (no real agents, no tokens):
 
