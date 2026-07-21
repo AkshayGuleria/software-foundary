@@ -1,0 +1,16 @@
+[playbook]
+id = "compounding_demo"
+description = "implement -> compound: a minimal playbook that writes a lesson every run"
+
+[[step]]
+id = "implement"
+role = "developer"
+produces = "code_diff_artifact"
+gate = "none"
+
+[[step]]
+id = "compound"
+role = "reviewer"
+needs = ["implement"]
+produces = "memory_items_artifact"
+gate = "none"
