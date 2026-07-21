@@ -1,8 +1,6 @@
-import { useEventStream } from "../hooks/useEventStream";
+import type { FeedEvent } from "../hooks/useEventStream";
 
-export default function EventFeed({ runId }: { runId: string }) {
-  const events = useEventStream(runId);
-
+export default function EventFeed({ events }: { events: FeedEvent[] }) {
   return (
     <div className="flex flex-col gap-1 font-mono text-xs">
       {events.length === 0 && <p className="text-slate-500">Waiting for events…</p>}
