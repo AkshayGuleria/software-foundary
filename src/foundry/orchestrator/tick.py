@@ -547,6 +547,36 @@ class Orchestrator:
                 "unit.blocked",
                 {"reason": "escalated", "escalated": escalated, "human_task_id": human_task_unit.id},
             )
+        elif step.produces == "memory_items_artifact":
+            # Generic compound-step contract (design doc §10): a playbook step
+            # whose declared `produces` is this specific literal is read as a
+            # list of {kind, title, body_md} items and written straight to the
+            # Memory store, one row per item. Same idiom as `escalates_on`
+            # above -- the engine has no semantic notion of "compound" or
+            # "lesson", only that this exact artifact shape triggers this exact
+            # store write. Per design doc §10 ("Every playbook ends with an
+            # ungated compound step"), this step is always ungated in practice,
+            # so once the memory rows are written it falls straight through to
+            # the same closing behavior as the gate in (None, "none") branch
+            # below (including worktree cleanup) rather than ever reaching the
+            # gated branch.
+            run = await self.store.get_run(run_id)
+            project_id = run.project_id if run is not None else None
+            items = artifact_payload.get("items", [])
+            for item in items:
+                await self.store.create_memory_item(
+                    scope="project",
+                    kind=item["kind"],
+                    title=item["title"],
+                    body_md=item["body_md"],
+                    project_id=project_id,
+                    source_run_id=run_id,
+                )
+            await self.store.update_unit(task_unit.id, status="closed")
+            await self.store.append_event(
+                run_id, task_unit.id, "unit.closed", {"memory_items_written": len(items)}
+            )
+            self._cleanup_worktree(task_unit.id)
         elif step.gate in (None, "none"):
             await self.store.update_unit(task_unit.id, status="closed")
             await self.store.append_event(run_id, task_unit.id, "unit.closed", {})
