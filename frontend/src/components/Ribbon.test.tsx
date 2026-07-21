@@ -5,7 +5,7 @@ import Ribbon from "./Ribbon";
 import type { WorkUnit } from "../api/types";
 
 const unit = (overrides: Partial<WorkUnit>): WorkUnit => ({
-  id: "01J0", step_id: "step", type: "task", status: "open", attempt: 0, owner_session_id: null, ...overrides,
+  id: "01J0", step_id: "step", type: "task", status: "open", attempt: 0, owner_session_id: null, convoy_id: null, ...overrides,
 });
 
 describe("Ribbon", () => {
