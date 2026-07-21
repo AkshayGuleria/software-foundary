@@ -1,7 +1,7 @@
 import pytest
 
 from foundry.playbook.loader import load_playbook
-from foundry.playbook.materializer import materialize
+from foundry.playbook.materializer import is_dynamic_step, materialize
 from foundry.store.db import init_db, make_engine, make_sessionmaker
 from foundry.store.store import Store
 
@@ -40,3 +40,33 @@ async def test_materialize_creates_units_and_dep_edges(tmp_path):
     }
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_materialize_skips_dynamic_steps(tmp_path):
+    engine = make_engine(str(tmp_path / "foundry.db"))
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+
+    project = await store.create_project("demo", str(tmp_path))
+    playbook = load_playbook("tests/playbook/fixtures/fanout_demo.toml")
+    run = await store.create_run(project.id, "fanout_demo.toml", "demo run")
+
+    step_to_unit = await materialize(playbook, run.id, store)
+
+    # Only "architecture" is static: implement/review/integrate are all
+    # transitively downstream of implement's fan_out.
+    assert set(step_to_unit) == {"architecture"}
+    units = await store.list_units(run.id)
+    assert len(units) == 1
+    assert units[0].step_id == "architecture"
+
+
+def test_is_dynamic_step_classification():
+    playbook = load_playbook("tests/playbook/fixtures/fanout_demo.toml")
+    by_id = {s.id: s for s in playbook.steps}
+    assert is_dynamic_step(by_id["architecture"], by_id) is False
+    assert is_dynamic_step(by_id["implement"], by_id) is True
+    assert is_dynamic_step(by_id["review"], by_id) is True
+    assert is_dynamic_step(by_id["integrate"], by_id) is True
