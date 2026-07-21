@@ -450,9 +450,39 @@ class Orchestrator:
         )
         await self.store.append_event(run_id, task_unit.id, "artifact.produced", {"artifact_id": artifact.id})
 
-        if step.gate in (None, "none"):
+        escalated = artifact_payload.get(step.escalates_on) if step.escalates_on else None
+        if escalated:
+            # Generic integrate-style human handoff (design doc §5.1): the engine
+            # only knows "artifact says escalate" — it has no opinion on merges,
+            # conflicts, or anything else semantic. A human_task work unit is
+            # created (instead of the normal gate) and the escalation payload is
+            # attached to unit.blocked for downstream consumers. The worktree is
+            # deliberately NOT cleaned up here (unlike the gate=none and gate
+            # branches below) — an escalation implies human intervention on the
+            # in-progress work, which may still need the worktree's contents.
+            human_task_unit = (
+                await self.store.create_work_units(
+                    [
+                        WorkUnit(
+                            run_id=run_id,
+                            step_id=f"{step.id}.escalation",
+                            type="human_task",
+                            status="open",
+                        )
+                    ]
+                )
+            )[0]
+            await self.store.update_unit(task_unit.id, status="blocked")
+            await self.store.append_event(
+                run_id,
+                task_unit.id,
+                "unit.blocked",
+                {"reason": "escalated", "escalated": escalated, "human_task_id": human_task_unit.id},
+            )
+        elif step.gate in (None, "none"):
             await self.store.update_unit(task_unit.id, status="closed")
             await self.store.append_event(run_id, task_unit.id, "unit.closed", {})
+            self._cleanup_worktree(task_unit.id)
         else:
             gate = await self.store.create_gate(
                 work_unit_id=task_unit.id,
@@ -465,9 +495,6 @@ class Orchestrator:
             # Store.decide_gate — apply_gate_decisions() picks it up next tick.
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})
-
-        if step.gate in (None, "none"):
-            self._cleanup_worktree(task_unit.id)
 
     def _cleanup_worktree(self, unit_id: str) -> None:
         path = self._unit_worktrees.pop(unit_id, None)
