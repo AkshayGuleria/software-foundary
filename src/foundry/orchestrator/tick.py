@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from foundry.drivers.base import AgentDriver, SessionSpec
+from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
 from foundry.store.models import Artifact, Gate, UnitDep, WorkUnit
 from foundry.store.store import Store
@@ -28,12 +29,23 @@ def _resolve_fan_out_slices(artifacts: list[Artifact], kind: str, field: str) ->
 
 
 class Orchestrator:
-    def __init__(self, store: Store, driver: AgentDriver, playbook: PlaybookSpec, concurrency: int = 5):
+    def __init__(
+        self,
+        store: Store,
+        driver: AgentDriver,
+        playbook: PlaybookSpec,
+        concurrency: int = 5,
+        worktree_manager: WorktreeManager | None = None,
+        project_path: str = ".",
+    ):
         self.store = store
         self.driver = driver
         self.playbook = playbook
         self.concurrency = concurrency
+        self.worktree_manager = worktree_manager
+        self.project_path = project_path
         self._steps_by_id: dict[str, StepSpec] = {s.id: s for s in playbook.steps}
+        self._unit_worktrees: dict[str, str] = {}
 
     async def tick(self, run_id: str) -> TickResult:
         await self.reconcile(run_id)
@@ -178,6 +190,7 @@ class Orchestrator:
             if gate.decision == "approved":
                 await self.store.update_unit(unit.id, status="closed")
                 await self.store.append_event(run_id, unit.id, "gate.approved", {"gate_id": gate.id})
+                self._cleanup_worktree(unit.id)
             elif gate.decision == "rejected":
                 await self.store.update_unit(unit.id, status="ready", attempt=unit.attempt + 1)
                 await self.store.append_event(run_id, unit.id, "gate.rejected", {"gate_id": gate.id})
@@ -351,8 +364,19 @@ class Orchestrator:
             await self.store.update_unit(task_unit.id, owner_session_id=session_unit.id)
             await self.store.append_event(run_id, session_unit.id, "session.intent", {})
 
+            cwd = "."
+            if step.writes and self.worktree_manager is not None:
+                # A retry (failed-but-under-max-attempts, or gate-rejected rework)
+                # deliberately keeps its worktree alive across dispatches — reuse
+                # it rather than re-running `git worktree add` on a branch/path
+                # that already exists, which would error.
+                cwd = self._unit_worktrees.get(task_unit.id)
+                if cwd is None:
+                    cwd = self.worktree_manager.create(self.project_path, run_id, task_unit.id)
+                    self._unit_worktrees[task_unit.id] = cwd
+
             spec = SessionSpec(
-                cwd=".",
+                cwd=cwd,
                 prompt=f"step:{step.id}",
                 model="fake",
                 tool_policy={},
@@ -408,6 +432,7 @@ class Orchestrator:
                 await self.store.append_event(
                     run_id, task_unit.id, "unit.blocked", {"reason": "failed", "error": error_payload}
                 )
+                self._cleanup_worktree(task_unit.id)
             else:
                 await self.store.update_unit(
                     task_unit.id, status="ready", attempt=next_attempt, owner_session_id=None
@@ -440,3 +465,11 @@ class Orchestrator:
             # Store.decide_gate — apply_gate_decisions() picks it up next tick.
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})
+
+        if step.gate in (None, "none"):
+            self._cleanup_worktree(task_unit.id)
+
+    def _cleanup_worktree(self, unit_id: str) -> None:
+        path = self._unit_worktrees.pop(unit_id, None)
+        if path is not None and self.worktree_manager is not None:
+            self.worktree_manager.remove(self.project_path, path)
