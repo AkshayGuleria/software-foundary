@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from foundry.drivers.base import AgentDriver, SessionSpec
+from foundry.kg.memory_retrieval import select_relevant_memory
+from foundry.kg.service import KGSnapshot, blast_radius
 from foundry.orchestrator.budget import check_budget
 from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
-from foundry.store.models import Artifact, Gate, UnitDep, WorkUnit
+from foundry.store.models import Artifact, Gate, Memory, UnitDep, WorkUnit
 from foundry.store.store import Store
 
 
@@ -38,6 +40,7 @@ class Orchestrator:
         concurrency: int = 5,
         worktree_manager: WorktreeManager | None = None,
         project_path: str = ".",
+        kg_snapshot: KGSnapshot | None = None,
     ):
         self.store = store
         self.driver = driver
@@ -45,6 +48,7 @@ class Orchestrator:
         self.concurrency = concurrency
         self.worktree_manager = worktree_manager
         self.project_path = project_path
+        self.kg_snapshot = kg_snapshot
         self._steps_by_id: dict[str, StepSpec] = {s.id: s for s in playbook.steps}
         self._unit_worktrees: dict[str, str] = {}
 
@@ -380,6 +384,38 @@ class Orchestrator:
                 await self.store.update_unit(convoy.id, status="closed")
                 await self.store.append_event(run_id, convoy.id, "convoy.closed", {"status": "closed"})
 
+    async def _compose_context_bundle(
+        self, run_id: str, task_unit: WorkUnit
+    ) -> tuple[list[str], list[Memory], int]:
+        # Which upstream artifacts feed INTO this dispatching unit: UnitDep rows
+        # for static ("needs") steps point needs_unit_id directly at the upstream
+        # *task* WorkUnit (see materializer.materialize), and _collect() always
+        # creates an artifact with work_unit_id == the task unit that produced it
+        # -- so matching artifact.work_unit_id against this unit's needs_unit_id
+        # set is exactly "artifacts produced by units I depend on", without any
+        # extra join through convoy/fan-out bookkeeping.
+        deps = await self.store.list_deps(run_id)
+        needed_ids = {d.needs_unit_id for d in deps if d.unit_id == task_unit.id}
+        artifacts = await self.store.list_artifacts(run_id)
+        input_files: list[str] = []
+        for artifact in artifacts:
+            if artifact.work_unit_id in needed_ids:
+                input_files.extend(artifact.payload_json.get("files", []))
+
+        bundle_files: set[str] = set(input_files)
+        if self.kg_snapshot is not None and input_files:
+            bundle_files = blast_radius(self.kg_snapshot, input_files)
+
+        run = await self.store.get_run(run_id)
+        memory_items: list[Memory] = []
+        if run is not None:
+            candidates = await self.store.list_memory_items(project_id=run.project_id)
+            query_text = " ".join(input_files) + " " + task_unit.step_id
+            memory_items = select_relevant_memory(candidates, query_text)
+
+        bundle_chars = sum(len(f) for f in bundle_files) + sum(len(m.body_md) for m in memory_items)
+        return sorted(bundle_files), memory_items, bundle_chars
+
     async def dispatch(self, run_id: str) -> int:
         units = await self.store.list_units(run_id)
         ready_tasks = [u for u in units if u.status == "ready" and u.type == "task"]
@@ -434,9 +470,21 @@ class Orchestrator:
                     cwd = self.worktree_manager.create(self.project_path, run_id, task_unit.id)
                     self._unit_worktrees[task_unit.id] = cwd
 
+            bundle_files, memory_items, bundle_chars = await self._compose_context_bundle(run_id, task_unit)
+            await self.store.append_event(
+                run_id,
+                session_unit.id,
+                "context.composed",
+                {
+                    "files_in_bundle": len(bundle_files),
+                    "memory_items": len(memory_items),
+                    "bundle_chars": bundle_chars,
+                },
+            )
+
             spec = SessionSpec(
                 cwd=cwd,
-                prompt=f"step:{step.id}",
+                prompt=f"step:{step.id} files:{len(bundle_files)} memory:{len(memory_items)}",
                 model="fake",
                 tool_policy={},
                 mcp_servers=[],
