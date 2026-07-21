@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { listProjects } from "../api/projects";
 import { createRun, listRuns } from "../api/runs";
+import MetricsSummary from "../components/MetricsSummary";
 import NewRunForm from "../components/NewRunForm";
 
 export default function RunsHomePage() {
@@ -23,6 +24,7 @@ export default function RunsHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-xl font-semibold">Runs{projectId ? " for project" : ""}</h2>
+      {projectId && <MetricsSummary projectId={projectId} />}
       {projects && projects.length > 0 && (
         <NewRunForm projects={projects} defaultProjectId={projectId} onSubmit={(input) => createMutation.mutate(input)} />
       )}
