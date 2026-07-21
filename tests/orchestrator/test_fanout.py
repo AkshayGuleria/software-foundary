@@ -57,6 +57,31 @@ async def test_fan_out_creates_convoy_and_per_slice_units_once_architecture_clos
 
 
 @pytest.mark.asyncio
+async def test_fan_out_does_not_fire_while_upstream_gate_is_still_pending(tmp_path):
+    # Regression test: the session unit dispatch() creates for "architecture"
+    # shares that step's step_id (see Orchestrator.dispatch), and FakeDriver
+    # closes it synchronously. If _fan_out's step_id -> unit lookup ever
+    # picks up that session instead of the architecture *task* unit, it
+    # would see "closed" and treat the human gate as satisfied even though
+    # the task itself is still "blocked" pending approval — bypassing the
+    # gate entirely.
+    script = {"architecture": FakeStepScript(artifact={"slices": ["auth", "billing", "notifications"]})}
+    store, run, orch = await _setup(tmp_path, script)
+
+    await orch.tick(run.id)  # dispatches architecture; session closes, task blocks on gate
+    gates = await store.list_gates_for_run(run.id)
+    arch_gate = next(g for g in gates if g.artifact_id is not None)
+    assert arch_gate.decision == "pending"
+
+    await orch.tick(run.id)  # must NOT fan out: the gate is still pending
+
+    units = await store.list_units(run.id)
+    arch_task = next(u for u in units if u.step_id == "architecture" and u.type == "task")
+    assert arch_task.status == "blocked"
+    assert [u for u in units if u.type == "convoy"] == []
+
+
+@pytest.mark.asyncio
 async def test_fan_out_is_idempotent_across_ticks(tmp_path):
     script = {"architecture": FakeStepScript(artifact={"slices": ["a", "b"]})}
     store, run, orch = await _setup(tmp_path, script)

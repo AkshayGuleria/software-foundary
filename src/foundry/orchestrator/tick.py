@@ -204,7 +204,19 @@ class Orchestrator:
 
     async def _fan_out(self, run_id: str) -> None:
         units = await self.store.list_units(run_id)
-        static_unit_by_step = {u.step_id: u for u in units if u.convoy_id is None and u.type != "convoy"}
+        # Only the unit type that actually represents a step's own completion
+        # state counts here (task/gate/human_task, per STEP_TYPE_TO_UNIT_TYPE).
+        # `session` units are dynamically spawned during dispatch() with the
+        # *same* step_id as the task that owns them (see dispatch()), and a
+        # session can close well before its owning gated task does (the task
+        # stays "blocked" pending gate approval). A step_id-keyed dict must
+        # exclude "session" or it silently collapses onto whichever unit for
+        # that step_id happens to sort last, which is very often the session
+        # — letting a pending/rejected gate be bypassed as if "needs" were met.
+        step_unit_types = set(STEP_TYPE_TO_UNIT_TYPE.values())
+        static_unit_by_step = {
+            u.step_id: u for u in units if u.convoy_id is None and u.type in step_unit_types
+        }
         expanded_steps = {u.step_id for u in units if u.type == "convoy"}
 
         for step in self.playbook.steps:
@@ -270,7 +282,9 @@ class Orchestrator:
                 )
 
             chain_ids = {s.id for s in chain}
-            already_materialized = {u.step_id for u in units if u.convoy_id is None and u.type != "convoy"}
+            already_materialized = {
+                u.step_id for u in units if u.convoy_id is None and u.type in step_unit_types
+            }
             downstream = [
                 s
                 for s in self.playbook.steps
