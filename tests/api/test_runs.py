@@ -106,6 +106,11 @@ async def test_get_run_detail_shows_units_and_gates_with_cost_estimate(api_clien
     assert derived_gates[0]["decision"] == "pending"
     assert derived_gates[0]["cost_estimate"]["estimated_writes_steps"] == 1
 
+    # sdlc_mini has no fan-out, so units should carry convoy_id as a present
+    # (non-missing) field, expected None.
+    assert all("convoy_id" in u for u in body["units"])
+    assert all(u["convoy_id"] is None for u in body["units"])
+
 
 @pytest.mark.asyncio
 async def test_list_runs_filters_by_project_and_status(api_client):

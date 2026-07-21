@@ -288,6 +288,33 @@ class Store:
 
         return await self.read(_op)
 
+    async def list_active_sessions(self) -> list[dict]:
+        async def _op(session):
+            res = await session.execute(
+                select(SessionRow, WorkUnit.run_id, WorkUnit.step_id)
+                .join(WorkUnit, WorkUnit.id == SessionRow.work_unit_id)
+                .where(SessionRow.status.in_(("intent", "running")))
+            )
+            rows = []
+            for session_row, run_id, step_id in res.all():
+                rows.append(
+                    {
+                        "id": session_row.id,
+                        "work_unit_id": session_row.work_unit_id,
+                        "run_id": run_id,
+                        "step_id": step_id,
+                        "driver": session_row.driver,
+                        "status": session_row.status,
+                        "model": session_row.model,
+                        "tokens_in": session_row.tokens_in,
+                        "tokens_out": session_row.tokens_out,
+                        "started_at": session_row.started_at.isoformat() if session_row.started_at else None,
+                    }
+                )
+            return rows
+
+        return await self.read(_op)
+
     # --- events ---
 
     async def append_event(
