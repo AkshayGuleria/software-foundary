@@ -555,9 +555,19 @@ class Orchestrator:
             # replacement for, apply_gate_decisions's existing handling of the
             # review gate itself, which runs unchanged on the next tick.
             if decision == "rejected" and step.loop is not None:
-                units = await self.store.list_units(run_id)
+                # Match via the review unit's own recorded dependency, not just
+                # "any unit with this step_id and convoy_id" -- inside a fan-out
+                # convoy, every slice's units share the SAME convoy_id (one convoy
+                # per fan-out step, not per slice; see _fan_out), so a convoy_id-only
+                # match is ambiguous across slices and can silently rework the wrong
+                # slice's unit. The dependency edge (created by _fan_out for chained
+                # steps, and by materialize() for static "needs" in the non-fan-out
+                # case) always points at the exact unit this review reviewed.
+                units_by_id = {u.id: u for u in await self.store.list_units(run_id)}
+                deps = await self.store.list_deps(run_id)
+                needed_ids = {d.needs_unit_id for d in deps if d.unit_id == unit.id}
                 back_to_unit = next(
-                    (u for u in units if u.step_id == step.loop.back_to and u.convoy_id == unit.convoy_id),
+                    (units_by_id[uid] for uid in needed_ids if units_by_id[uid].step_id == step.loop.back_to),
                     None,
                 )
                 # Skip if already escalated to a human gate from a prior round --
@@ -566,7 +576,16 @@ class Orchestrator:
                 # upstream unit) would create another duplicate human gate.
                 if back_to_unit is not None and back_to_unit.status != "blocked":
                     next_attempt = back_to_unit.attempt + 1
-                    if next_attempt >= back_to_unit.max_attempts:
+                    # The cap is step.loop.max_rounds (the review step's own declared
+                    # round budget), not back_to_unit.max_attempts: that field is a
+                    # different concern (back_to_unit's own driver-failure retry cap,
+                    # enforced separately by _collect) and is not populated from
+                    # loop.max_rounds -- in the fan-out convoy path, _fan_out derives
+                    # max_attempts from each chain_step's *own* .loop, so it lands on
+                    # the review unit, never on the unit being reopened here. Using it
+                    # as the round cap would silently ignore the playbook author's
+                    # declared max_rounds whenever the two numbers differ.
+                    if next_attempt >= step.loop.max_rounds:
                         await self.store.update_unit(back_to_unit.id, status="blocked", attempt=next_attempt)
                         await self.store.create_gate(
                             work_unit_id=back_to_unit.id, gate_type="human", decision="pending"
