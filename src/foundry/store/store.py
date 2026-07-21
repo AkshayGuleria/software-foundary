@@ -11,6 +11,7 @@ from foundry.store.models import (
     Artifact,
     Event,
     Gate,
+    Memory,
     Project,
     Run,
     SessionRow,
@@ -334,6 +335,56 @@ class Store:
             res = await session.execute(
                 select(Event).where(Event.run_id == run_id, Event.seq > after_seq).order_by(Event.seq)
             )
+            return list(res.scalars())
+
+        return await self.read(_op)
+
+    # --- memory ---
+
+    async def create_memory_item(
+        self,
+        scope: str,
+        kind: str,
+        title: str,
+        body_md: str,
+        project_id: str | None = None,
+        pack_id: str | None = None,
+        source_run_id: str | None = None,
+    ) -> Memory:
+        async def _op(session):
+            item = Memory(
+                scope=scope,
+                kind=kind,
+                title=title,
+                body_md=body_md,
+                project_id=project_id,
+                pack_id=pack_id,
+                source_run_id=source_run_id,
+            )
+            session.add(item)
+            await session.flush()
+            return item
+
+        return await self.write(_op)
+
+    async def list_memory_items(
+        self,
+        scope: str | None = None,
+        project_id: str | None = None,
+        pack_id: str | None = None,
+        kind: str | None = None,
+    ) -> list[Memory]:
+        async def _op(session):
+            stmt = select(Memory)
+            if scope is not None:
+                stmt = stmt.where(Memory.scope == scope)
+            if project_id is not None:
+                stmt = stmt.where(Memory.project_id == project_id)
+            if pack_id is not None:
+                stmt = stmt.where(Memory.pack_id == pack_id)
+            if kind is not None:
+                stmt = stmt.where(Memory.kind == kind)
+            res = await session.execute(stmt)
             return list(res.scalars())
 
         return await self.read(_op)

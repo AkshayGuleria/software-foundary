@@ -143,6 +143,7 @@ class Memory(Base):
     __tablename__ = "memory"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     pack_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(String, nullable=True)
     scope: Mapped[str] = mapped_column(String)  # pack|project|role
     kind: Mapped[str] = mapped_column(String)  # lesson|pattern|pitfall
     title: Mapped[str] = mapped_column(String)
