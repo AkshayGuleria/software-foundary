@@ -1,4 +1,5 @@
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import FleetPage from "./pages/FleetPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import RunDetailPage from "./pages/RunDetailPage";
 import RunsHomePage from "./pages/RunsHomePage";
@@ -15,6 +16,9 @@ export default function App() {
           <NavLink to="/runs" className="text-slate-400 hover:text-orange-400">
             Runs
           </NavLink>
+          <NavLink to="/fleet" className="text-slate-400 hover:text-orange-400">
+            Fleet
+          </NavLink>
         </nav>
       </header>
       <main className="p-6">
@@ -23,6 +27,7 @@ export default function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/runs" element={<RunsHomePage />} />
           <Route path="/runs/:id" element={<RunDetailPage />} />
+          <Route path="/fleet" element={<FleetPage />} />
         </Routes>
       </main>
     </div>

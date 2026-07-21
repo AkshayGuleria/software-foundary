@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { decideGate } from "../api/gates";
-import { cancelRun, getRunArtifacts, getRunDetail } from "../api/runs";
+import { cancelRun, getRunArtifacts, getRunDetail, getRunGraph } from "../api/runs";
+import DagView from "../components/DagView";
 import EventFeed from "../components/EventFeed";
 import GateCard from "../components/GateCard";
 import Ribbon from "../components/Ribbon";
@@ -16,18 +17,20 @@ export default function RunDetailPage() {
 
   const { data: detail, isLoading } = useQuery({ queryKey: ["run", runId], queryFn: () => getRunDetail(runId) });
   const { data: artifacts } = useQuery({ queryKey: ["run-artifacts", runId], queryFn: () => getRunArtifacts(runId) });
+  const { data: graph } = useQuery({ queryKey: ["run-graph", runId], queryFn: () => getRunGraph(runId) });
 
   // The scheduler drives run progress in the background (new gates, artifacts,
   // and unit status all change outside of any request this page makes). The
   // live feed is the only signal that something changed server-side, so treat
   // each incoming event as a cue to refetch the run's derived state — without
-  // this, the ribbon and gates/artifacts panel go stale the moment progress
+  // this, the ribbon, gates/artifacts panel, and DAG go stale the moment progress
   // happens off the back of a decision made on some other page (or by the
   // scheduler ticking on its own), even though the feed keeps scrolling.
   useEffect(() => {
     if (events.length === 0) return;
     queryClient.invalidateQueries({ queryKey: ["run", runId] });
     queryClient.invalidateQueries({ queryKey: ["run-artifacts", runId] });
+    queryClient.invalidateQueries({ queryKey: ["run-graph", runId] });
   }, [events.length, runId, queryClient]);
 
   const decideMutation = useMutation({
@@ -91,6 +94,15 @@ export default function RunDetailPage() {
           <EventFeed events={events} />
         </div>
       </div>
+
+      {graph && (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">DAG</h3>
+          <div className="overflow-x-auto">
+            <DagView units={graph.units} deps={graph.deps} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

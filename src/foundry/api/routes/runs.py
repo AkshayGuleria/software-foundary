@@ -42,6 +42,7 @@ class WorkUnitOut(BaseModel):
     status: str
     attempt: int
     owner_session_id: str | None
+    convoy_id: str | None
 
 
 class GateOut(BaseModel):
@@ -97,6 +98,7 @@ def _to_unit_out(u: WorkUnit) -> WorkUnitOut:
         status=u.status,
         attempt=u.attempt,
         owner_session_id=u.owner_session_id,
+        convoy_id=u.convoy_id,
     )
 
 

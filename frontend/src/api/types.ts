@@ -49,6 +49,7 @@ export interface WorkUnit {
   status: string;
   attempt: number;
   owner_session_id: string | null;
+  convoy_id: string | null;
 }
 
 export interface CostEstimate {
@@ -65,6 +66,19 @@ export interface Gate {
   artifact_id?: string | null;
   cost_estimate?: CostEstimate | null;
   decided_by?: string | null;
+}
+
+export interface Session {
+  id: string;
+  work_unit_id: string;
+  run_id: string;
+  step_id: string;
+  driver: string;
+  status: string;
+  model: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  started_at: string | null;
 }
 
 export interface Artifact {
