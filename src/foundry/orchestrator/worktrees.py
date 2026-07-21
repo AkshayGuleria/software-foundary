@@ -84,12 +84,24 @@ class WorktreeManager:
             env=_git_env(),
         )
         blocks = result.stdout.split("\n\n")
-        target = str(Path(worktree_path))
+        # git reports worktree paths canonicalized (symlinks resolved) in this
+        # output -- e.g. on macOS, /var is itself a symlink to /private/var, so
+        # a path built from a `tmp_path`-style fixture under /var/folders/...
+        # comes back from git as /private/var/folders/.... Comparing the raw,
+        # unresolved `worktree_path` against that would never match, silently
+        # skipping branch deletion below -- which left a stale branch behind
+        # and made every *second* `create()` for the same run_id/unit_id (the
+        # exact case a gate-rejection rework hits, once the worktree from the
+        # first attempt has already been cleaned up) fail with "fatal: a
+        # branch named '...' already exists". Resolve both sides so the
+        # comparison is symlink-agnostic.
+        target = str(Path(worktree_path).resolve())
         for block in blocks:
             lines = block.splitlines()
             if not lines or not lines[0].startswith("worktree "):
                 continue
-            if lines[0].removeprefix("worktree ") != target:
+            reported_path = Path(lines[0].removeprefix("worktree "))
+            if str(reported_path.resolve()) != target:
                 continue
             for line in lines:
                 if line.startswith("branch refs/heads/"):

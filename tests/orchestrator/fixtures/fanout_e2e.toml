@@ -1,0 +1,35 @@
+[playbook]
+id = "fanout_e2e"
+description = "3-slice fan-out: architecture -> implement -> review (agent loop) -> integrate (escalation)"
+
+[[step]]
+id = "architecture"
+role = "architect"
+produces = "architecture_artifact"
+gate = "human"
+
+[[step]]
+id = "implement"
+role = "developer"
+needs = ["architecture"]
+fan_out = "architecture_artifact.slices"
+produces = "code_diff_artifact"
+gate = "none"
+writes = true
+
+[[step]]
+id = "review"
+role = "reviewer"
+needs = ["implement"]
+fan_out_from = "implement"
+produces = "review_artifact"
+gate = "agent"
+loop = { back_to = "implement", max_rounds = 3 }
+
+[[step]]
+id = "integrate"
+role = "integrator"
+needs = ["review"]
+produces = "integration_artifact"
+gate = "human"
+escalates_on = "escalated"
