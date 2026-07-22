@@ -1,4 +1,4 @@
-playbooks = ["playbooks/sdlc_story.toml"]
+playbooks = ["playbooks/sdlc_story.toml", "playbooks/bugfix.toml"]
 
 [pack]
 id = "default"
