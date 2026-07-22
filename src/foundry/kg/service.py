@@ -46,19 +46,37 @@ def _resolve_imports(path: Path, root: Path, known_files: set[str]) -> set[str]:
 
     resolved: set[str] = set()
     for module_name in module_names:
-        candidate = _module_to_relpath(module_name, known_files)
+        candidate = _module_to_relpath(module_name, known_files, root.name)
         if candidate is not None:
             resolved.add(candidate)
     return resolved
 
 
-def _module_to_relpath(module_name: str, known_files: set[str]) -> str | None:
-    as_path = module_name.replace(".", "/")
-    for candidate in (f"{as_path}.py", f"{as_path}/__init__.py"):
-        if candidate in known_files:
-            return candidate
+def _module_to_relpath(module_name: str, known_files: set[str], root_name: str) -> str | None:
+    # A project is often registered pointed directly at its own top-level
+    # package directory (e.g. this repo's own `src/foundry`, not `src`), in
+    # which case that package's internal modules import each other with
+    # fully-qualified absolute imports rooted at the package's own name
+    # (`from foundry.x import y`) rather than relative imports. `known_files`
+    # in that scenario never carries the package's own name as a path prefix
+    # (files are just "x/y.py", not "foundry/x/y.py"), so a leading
+    # "<root-package-name>." component must be tried stripped as well as
+    # left intact, or every self-referential absolute import silently fails
+    # to resolve and the whole tree looks edge-less.
+    candidates_names = [module_name]
+    prefix = f"{root_name}."
+    if module_name.startswith(prefix):
+        candidates_names.append(module_name[len(prefix) :])
+
+    for name in candidates_names:
+        as_path = name.replace(".", "/")
+        for candidate in (f"{as_path}.py", f"{as_path}/__init__.py"):
+            if candidate in known_files:
+                return candidate
+
     # Also try treating the module name as rooted one level below any known
     # top-level package (handles fixtures/tests laid out under a subdir).
+    as_path = module_name.replace(".", "/")
     for known in known_files:
         if known.endswith(f"/{as_path}.py") or known.endswith(f"/{as_path}/__init__.py"):
             return known

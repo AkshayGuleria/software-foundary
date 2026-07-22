@@ -51,3 +51,20 @@ def test_blast_radius_isolated_file_has_no_neighbors():
     snapshot = build_kg(FIXTURE_ROOT)
     radius = blast_radius(snapshot, ["sample_project/isolated.py"], depth=2)
     assert radius == {"sample_project/isolated.py"}
+
+
+def test_build_kg_resolves_self_referential_absolute_imports_when_rooted_at_the_package_itself():
+    # Real-world case (found during M3b Task 7 end-to-end verification): a
+    # project is registered pointed directly at its own top-level package
+    # directory (e.g. this repo's `src/foundry`, not `src`), and that
+    # package's internal modules import each other with fully-qualified
+    # absolute imports rooted at the package's own name (`from foundry.x
+    # import y`), not relative imports. `known_files` in that scenario never
+    # carries the package's own name as a path prefix (files are just
+    # "x/y.py", not "foundry/x/y.py"), so the resolver must recognize and
+    # strip a leading "<root-package-name>." component from the module name.
+    package_root = str(Path(FIXTURE_ROOT) / "sample_project")
+    snapshot = build_kg(package_root)
+    assert snapshot.nodes == {"__init__.py", "a.py", "b.py", "c.py", "isolated.py"}
+    assert "b.py" in snapshot.imports["a.py"]
+    assert "c.py" in snapshot.imports["b.py"]
