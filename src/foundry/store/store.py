@@ -88,9 +88,16 @@ class Store:
 
         return await self.read(_op)
 
-    async def create_run(self, project_id: str, playbook_ref: str, title: str) -> Run:
+    async def create_run(
+        self, project_id: str, playbook_ref: str, title: str, pack_version_pin: str = "local"
+    ) -> Run:
         async def _op(session):
-            run = Run(project_id=project_id, playbook_ref=playbook_ref, title=title)
+            run = Run(
+                project_id=project_id,
+                playbook_ref=playbook_ref,
+                title=title,
+                pack_version_pin=pack_version_pin,
+            )
             session.add(run)
             await session.flush()
             return run

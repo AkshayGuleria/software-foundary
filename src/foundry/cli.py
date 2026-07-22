@@ -9,6 +9,7 @@ from foundry.api.app import create_app
 from foundry.api.scheduler import Scheduler
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.tick import Orchestrator
+from foundry.packs.resolve import resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
@@ -44,8 +45,11 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
 
+    pack_version_pin = resolve_pack_version(playbook_path)
     project = await store.create_project(playbook.id, project_path)
-    run_row = await store.create_run(project.id, playbook_path, playbook.description or playbook.id)
+    run_row = await store.create_run(
+        project.id, playbook_path, playbook.description or playbook.id, pack_version_pin=pack_version_pin
+    )
     await materialize(playbook, run_row.id, store)
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}

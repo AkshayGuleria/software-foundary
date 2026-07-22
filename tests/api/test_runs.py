@@ -235,3 +235,15 @@ async def test_cancel_missing_run_returns_404(api_client):
     client, _store, _scheduler = api_client
     resp = await client.post("/api/runs/does-not-exist/cancel")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_run_pins_pack_version_when_playbook_is_pack_content(api_client):
+    client, store, _scheduler = api_client
+    project = await store.create_project("demo", ".")
+    resp = await client.post(
+        "/api/runs",
+        json={"project_id": project.id, "playbook_path": "packs/default/playbooks/sdlc_story.toml"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["data"]["pack_version_pin"] == "default@0.1.0"

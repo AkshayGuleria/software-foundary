@@ -8,6 +8,7 @@ from foundry.api.routes.projects import _get_store
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.cost import estimate_plan_cost
+from foundry.packs.resolve import resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
@@ -33,6 +34,7 @@ class RunOut(BaseModel):
     title: str
     status: str
     created_at: str
+    pack_version_pin: str
 
 
 class WorkUnitOut(BaseModel):
@@ -87,6 +89,7 @@ def _to_run_out(r: Run) -> RunOut:
         title=r.title,
         status=r.status,
         created_at=r.created_at.isoformat(),
+        pack_version_pin=r.pack_version_pin,
     )
 
 
@@ -129,7 +132,8 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
         raise ValidationApiError(str(e)) from e
 
     title = body.title or playbook.description or playbook.id
-    run = await store.create_run(project.id, body.playbook_path, title)
+    pack_version_pin = resolve_pack_version(body.playbook_path)
+    run = await store.create_run(project.id, body.playbook_path, title, pack_version_pin=pack_version_pin)
     await materialize(playbook, run.id, store)
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
