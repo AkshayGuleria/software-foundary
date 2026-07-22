@@ -25,6 +25,7 @@ class RunCreate(BaseModel):
     project_id: str
     playbook_path: str
     title: str | None = None
+    gate_overrides: dict[str, str] | None = None
 
 
 class RunOut(BaseModel):
@@ -135,9 +136,11 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
     pack_version_pin = resolve_pack_version(body.playbook_path)
     run = await store.create_run(project.id, body.playbook_path, title, pack_version_pin=pack_version_pin)
     await materialize(playbook, run.id, store)
+    if body.gate_overrides:
+        await store.update_run(run.id, gate_overrides_json=body.gate_overrides)
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
-    scheduler.register(run.id, FakeDriver(script), playbook)
+    scheduler.register(run.id, FakeDriver(script), playbook, gate_overrides=body.gate_overrides)
 
     return ApiResponse[RunOut](data=_to_run_out(run), paging=Paging.none())
 

@@ -41,6 +41,7 @@ class Orchestrator:
         worktree_manager: WorktreeManager | None = None,
         project_path: str = ".",
         kg_snapshot: KGSnapshot | None = None,
+        gate_overrides: dict[str, str] | None = None,
     ):
         self.store = store
         self.driver = driver
@@ -49,6 +50,7 @@ class Orchestrator:
         self.worktree_manager = worktree_manager
         self.project_path = project_path
         self.kg_snapshot = kg_snapshot
+        self.gate_overrides = gate_overrides or {}
         self._steps_by_id: dict[str, StepSpec] = {s.id: s for s in playbook.steps}
         self._unit_worktrees: dict[str, str] = {}
 
@@ -704,6 +706,23 @@ class Orchestrator:
             # Store.decide_gate — apply_gate_decisions() picks it up next tick.
             await self.store.update_unit(task_unit.id, status="blocked")
             await self.store.append_event(run_id, task_unit.id, "gate.created", {"gate_id": gate.id})
+
+            if step.id in self.gate_overrides:
+                # M4a: a run-level policy override pre-decides the gate right
+                # away instead of leaving it pending for a human/agent. The
+                # gate row still exists (and is still the thing
+                # apply_gate_decisions acts on next tick to unblock the unit),
+                # so it stays visible/auditable in the dashboard and event log
+                # — it's just never actually left in the "pending" state a
+                # human would otherwise see queued for decision.
+                override_decision = self.gate_overrides[step.id]
+                await self.store.decide_gate(gate.id, override_decision, decided_by="run_override")
+                await self.store.append_event(
+                    run_id,
+                    task_unit.id,
+                    "gate.policy_overridden",
+                    {"gate_id": gate.id, "decision": override_decision},
+                )
 
     async def _dispatch_agent_reviews(self, run_id: str) -> None:
         gates = await self.store.list_gates_for_run(run_id)

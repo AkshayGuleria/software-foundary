@@ -64,6 +64,7 @@ class Run(Base):
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     closed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    gate_overrides_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class WorkUnit(Base):
