@@ -376,6 +376,13 @@ class Store:
     async def archive_run_events(self, run_id: str, archive_dir: str) -> str:
         events = await self.list_events(run_id)
         archive_path = Path(archive_dir) / f"{run_id}.jsonl.gz"
+
+        if not events and archive_path.exists():
+            # Redundant re-run: a prior invocation already archived and pruned this
+            # run's events. Do not touch the existing archive file (it would be
+            # truncated to empty) and there is nothing left to delete.
+            return str(archive_path)
+
         with gzip.open(archive_path, "wt") as f:
             for ev in events:
                 f.write(

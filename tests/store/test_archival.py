@@ -40,6 +40,36 @@ async def test_archive_run_events_writes_gzip_jsonl_and_prunes_hot_table(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_archive_run_events_second_invocation_does_not_destroy_archive(tmp_path):
+    store = await _store(tmp_path)
+    project = await store.create_project("demo", str(tmp_path))
+    run = await store.create_run(project.id, "p.toml", "demo")
+    await store.append_event(run.id, None, "run.created", {"x": 1})
+    await store.append_event(run.id, None, "run.closed", {"y": 2})
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+
+    # First archival: writes the archive and prunes events from the hot table.
+    first_path = await store.archive_run_events(run.id, str(archive_dir))
+    with gzip.open(first_path, "rt") as f:
+        first_lines = [json.loads(line) for line in f]
+    assert len(first_lines) == 2
+
+    # Second, redundant invocation (e.g. a cron re-run before the run ages out of
+    # the eligibility window): events are already gone from the hot table, so this
+    # must NOT truncate the previously-written archive.
+    second_path = await store.archive_run_events(run.id, str(archive_dir))
+    assert second_path == first_path
+
+    with gzip.open(second_path, "rt") as f:
+        second_lines = [json.loads(line) for line in f]
+    assert len(second_lines) == 2
+    assert {line["type"] for line in second_lines} == {"run.created", "run.closed"}
+    await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_list_closed_runs_older_than_excludes_recent_and_active_runs(tmp_path):
     store = await _store(tmp_path)
     project = await store.create_project("demo", str(tmp_path))
