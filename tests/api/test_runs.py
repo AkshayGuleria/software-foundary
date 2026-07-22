@@ -235,3 +235,52 @@ async def test_cancel_missing_run_returns_404(api_client):
     client, _store, _scheduler = api_client
     resp = await client.post("/api/runs/does-not-exist/cancel")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_run_pins_pack_version_when_playbook_is_pack_content(api_client):
+    client, store, _scheduler = api_client
+    project = await store.create_project("demo", ".")
+    resp = await client.post(
+        "/api/runs",
+        json={"project_id": project.id, "playbook_path": "packs/default/playbooks/sdlc_story.toml"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["data"]["pack_version_pin"] == "default@0.1.0"
+
+
+@pytest.mark.asyncio
+async def test_create_run_with_gate_overrides_persists_and_applies_them(api_client):
+    client, store, _scheduler = api_client
+    project = await store.create_project("demo2", ".")
+    resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project.id,
+            "playbook_path": "packs/default/playbooks/bugfix.toml",
+            "gate_overrides": {"diagnose": "approved"},
+        },
+    )
+    assert resp.status_code == 201
+    run_id = resp.json()["data"]["id"]
+    run_row = await store.get_run(run_id)
+    assert run_row.gate_overrides_json == {"diagnose": "approved"}
+
+
+@pytest.mark.asyncio
+async def test_create_run_with_invalid_gate_override_value_returns_400(api_client):
+    # apply_gate_decisions only recognizes "approved"/"rejected" -- any other
+    # string would silently leave the unit blocked forever with no error, so
+    # the request boundary must reject bad values instead of accepting them.
+    client, store, _scheduler = api_client
+    project = await store.create_project("demo3", ".")
+    resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project.id,
+            "playbook_path": "packs/default/playbooks/bugfix.toml",
+            "gate_overrides": {"diagnose": "maybe"},
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"

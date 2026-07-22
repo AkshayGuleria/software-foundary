@@ -1,0 +1,16 @@
+[playbook]
+id = "simple"
+description = "a trivial playbook for pack-loader tests"
+
+[[step]]
+id = "implement"
+role = "dev"
+produces = "code_diff_artifact"
+gate = "none"
+
+[[step]]
+id = "review"
+role = "reviewer"
+needs = ["implement"]
+produces = "review_artifact"
+gate = "none"

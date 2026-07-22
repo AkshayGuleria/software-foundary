@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
+import json
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from foundry.store.models import (
@@ -88,9 +92,26 @@ class Store:
 
         return await self.read(_op)
 
-    async def create_run(self, project_id: str, playbook_ref: str, title: str) -> Run:
+    async def update_project(self, project_id: str, **fields) -> None:
         async def _op(session):
-            run = Run(project_id=project_id, playbook_ref=playbook_ref, title=title)
+            project = await session.get(Project, project_id)
+            if project is None:
+                raise ValueError(f"Project {project_id} not found")
+            for key, value in fields.items():
+                setattr(project, key, value)
+
+        await self.write(_op)
+
+    async def create_run(
+        self, project_id: str, playbook_ref: str, title: str, pack_version_pin: str = "local"
+    ) -> Run:
+        async def _op(session):
+            run = Run(
+                project_id=project_id,
+                playbook_ref=playbook_ref,
+                title=title,
+                pack_version_pin=pack_version_pin,
+            )
             session.add(run)
             await session.flush()
             return run
@@ -338,6 +359,51 @@ class Store:
             return list(res.scalars())
 
         return await self.read(_op)
+
+    async def list_closed_runs_older_than(self, days: int) -> list[Run]:
+        async def _op(session):
+            cutoff = utcnow() - timedelta(days=days)
+            stmt = select(Run).where(
+                Run.status.in_(("closed", "cancelled", "failed")),
+                Run.closed_at.is_not(None),
+                Run.closed_at < cutoff,
+            )
+            res = await session.execute(stmt)
+            return list(res.scalars())
+
+        return await self.read(_op)
+
+    async def archive_run_events(self, run_id: str, archive_dir: str) -> str:
+        events = await self.list_events(run_id)
+        archive_path = Path(archive_dir) / f"{run_id}.jsonl.gz"
+
+        if not events and archive_path.exists():
+            # Redundant re-run: a prior invocation already archived and pruned this
+            # run's events. Do not touch the existing archive file (it would be
+            # truncated to empty) and there is nothing left to delete.
+            return str(archive_path)
+
+        with gzip.open(archive_path, "wt") as f:
+            for ev in events:
+                f.write(
+                    json.dumps(
+                        {
+                            "seq": ev.seq,
+                            "run_id": ev.run_id,
+                            "unit_id": ev.unit_id,
+                            "type": ev.type,
+                            "payload_json": ev.payload_json,
+                            "created_at": ev.created_at.isoformat(),
+                        }
+                    )
+                    + "\n"
+                )
+
+        async def _op(session):
+            await session.execute(delete(Event).where(Event.run_id == run_id))
+
+        await self.write(_op)
+        return str(archive_path)
 
     # --- memory ---
 

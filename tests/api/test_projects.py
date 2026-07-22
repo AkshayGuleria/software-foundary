@@ -72,3 +72,53 @@ async def test_create_project_with_malformed_body_returns_adr001_envelope(api_cl
     body = resp.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["error"]["path"] == "/api/projects"
+
+
+@pytest.mark.asyncio
+async def test_pause_then_activate_project(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo", "path": "."})
+    project_id = resp.json()["data"]["id"]
+
+    resp = await client.post(f"/api/projects/{project_id}/pause")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "paused"
+
+    resp = await client.post(f"/api/projects/{project_id}/activate")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_pausing_an_already_paused_project_409s(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo2", "path": "."})
+    project_id = resp.json()["data"]["id"]
+    await client.post(f"/api/projects/{project_id}/pause")
+
+    resp = await client.post(f"/api/projects/{project_id}/pause")
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_archive_project(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo3", "path": "."})
+    project_id = resp.json()["data"]["id"]
+
+    resp = await client.post(f"/api/projects/{project_id}/archive")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_creating_a_run_for_a_paused_project_409s(api_client):
+    client, store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo4", "path": "."})
+    project_id = resp.json()["data"]["id"]
+    await client.post(f"/api/projects/{project_id}/pause")
+
+    resp = await client.post(
+        "/api/runs", json={"project_id": project_id, "playbook_path": "packs/default/playbooks/bugfix.toml"}
+    )
+    assert resp.status_code == 409

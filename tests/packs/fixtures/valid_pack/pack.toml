@@ -1,0 +1,13 @@
+playbooks = ["playbooks/simple.toml"]
+
+[pack]
+id = "test_pack"
+version = "0.1.0"
+
+[[role]]
+id = "dev"
+model = "fake"
+
+[[role]]
+id = "reviewer"
+model = "fake"

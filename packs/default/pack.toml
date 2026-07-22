@@ -1,0 +1,33 @@
+playbooks = ["playbooks/sdlc_story.toml", "playbooks/bugfix.toml"]
+
+[pack]
+id = "default"
+version = "0.1.0"
+
+[[role]]
+id = "product_owner"
+model = "fake"
+
+[[role]]
+id = "architect"
+model = "fake"
+
+[[role]]
+id = "qa"
+model = "fake"
+
+[[role]]
+id = "system"
+model = "fake"
+
+[[role]]
+id = "developer"
+model = "fake"
+
+[[role]]
+id = "reviewer"
+model = "fake"
+
+[[role]]
+id = "integrator"
+model = "fake"

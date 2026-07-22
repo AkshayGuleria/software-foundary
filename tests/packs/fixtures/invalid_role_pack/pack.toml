@@ -1,0 +1,9 @@
+playbooks = ["playbooks/unresolved.toml"]
+
+[pack]
+id = "bad_pack"
+version = "0.1.0"
+
+[[role]]
+id = "dev"
+model = "fake"

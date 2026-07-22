@@ -64,9 +64,16 @@ class Scheduler:
         self._running = False
 
     def register(
-        self, run_id: str, driver: AgentDriver, playbook: PlaybookSpec, project_id: str | None = None
+        self,
+        run_id: str,
+        driver: AgentDriver,
+        playbook: PlaybookSpec,
+        project_id: str | None = None,
+        gate_overrides: dict[str, str] | None = None,
     ) -> None:
-        self._orchestrators[run_id] = Orchestrator(self.store, driver, playbook)
+        self._orchestrators[run_id] = Orchestrator(
+            self.store, driver, playbook, gate_overrides=gate_overrides
+        )
         if project_id is not None:
             self._project_by_run[run_id] = project_id
 

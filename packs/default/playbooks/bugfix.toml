@@ -1,0 +1,30 @@
+[playbook]
+id = "bugfix"
+description = "Bug fix: diagnose -> fix -> review, no fan-out, a structurally different shape from sdlc_story"
+
+[[step]]
+id = "diagnose"
+role = "developer"
+produces = "diagnosis_artifact"
+gate = "human"
+
+[[step]]
+id = "diagnose_approval"
+role = "system"
+type = "derived_gate"
+needs = ["diagnose"]
+
+[[step]]
+id = "fix"
+role = "developer"
+needs = ["diagnose_approval"]
+produces = "code_diff_artifact"
+gate = "none"
+writes = true
+
+[[step]]
+id = "review"
+role = "reviewer"
+needs = ["fix"]
+produces = "review_artifact"
+gate = "human"
