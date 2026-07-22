@@ -49,3 +49,21 @@ def load_pack(pack_dir: str) -> PackManifest:
                 )
 
     return manifest
+
+
+def list_packs(packs_root: str) -> list[PackManifest]:
+    root = Path(packs_root)
+    if not root.is_dir():
+        return []
+
+    manifests: list[PackManifest] = []
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir():
+            continue
+        if not (entry / "pack.toml").exists():
+            continue
+        try:
+            manifests.append(load_pack(str(entry)))
+        except (PackLoadError, tomllib.TOMLDecodeError):
+            continue
+    return manifests

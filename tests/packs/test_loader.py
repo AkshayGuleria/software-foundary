@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from foundry.packs.loader import PackLoadError, load_pack
+from foundry.packs.loader import PackLoadError, list_packs, load_pack
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -33,3 +33,19 @@ def test_load_pack_missing_referenced_playbook_raises(tmp_path):
     )
     with pytest.raises(PackLoadError, match="missing.toml"):
         load_pack(str(tmp_path))
+
+
+def test_list_packs_scans_subdirectories_and_skips_broken_ones(tmp_path):
+    good_dir = tmp_path / "good_pack"
+    good_dir.mkdir()
+    (good_dir / "pack.toml").write_text('playbooks = []\n\n[pack]\nid = "good"\nversion = "1.0.0"\n')
+
+    broken_dir = tmp_path / "broken_pack"
+    broken_dir.mkdir()
+    (broken_dir / "pack.toml").write_text("not valid toml [[[")
+
+    not_a_pack_dir = tmp_path / "not_a_pack"
+    not_a_pack_dir.mkdir()  # no pack.toml at all
+
+    manifests = list_packs(str(tmp_path))
+    assert [m.id for m in manifests] == ["good"]
