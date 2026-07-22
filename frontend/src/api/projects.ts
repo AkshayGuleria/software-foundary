@@ -14,3 +14,18 @@ export async function createProject(input: { name: string; path: string }): Prom
   });
   return res.data;
 }
+
+export async function pauseProject(id: string): Promise<Project> {
+  const res = await apiFetch<Project>(`/api/projects/${id}/pause`, { method: "POST" });
+  return res.data;
+}
+
+export async function archiveProject(id: string): Promise<Project> {
+  const res = await apiFetch<Project>(`/api/projects/${id}/archive`, { method: "POST" });
+  return res.data;
+}
+
+export async function activateProject(id: string): Promise<Project> {
+  const res = await apiFetch<Project>(`/api/projects/${id}/activate`, { method: "POST" });
+  return res.data;
+}
