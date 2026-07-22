@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import typer
 import uvicorn
@@ -105,6 +106,29 @@ async def _events(run_id: str, db: str, once: bool) -> None:
         if once:
             break
         await asyncio.sleep(0.2)
+
+    await store.stop()
+
+
+@app.command("archive-events")
+def archive_events(db: str = "foundry.db", archive_dir: str = "./archive", older_than_days: int = 30) -> None:
+    asyncio.run(_archive_events(db, archive_dir, older_than_days))
+
+
+async def _archive_events(db: str, archive_dir: str, older_than_days: int) -> None:
+    os.makedirs(archive_dir, exist_ok=True)
+    engine = make_engine(db)
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+
+    eligible = await store.list_closed_runs_older_than(older_than_days)
+    for run in eligible:
+        path = await store.archive_run_events(run.id, archive_dir)
+        typer.echo(f"archived {run.id} -> {path}")
+
+    if not eligible:
+        typer.echo("no eligible runs to archive")
 
     await store.stop()
 

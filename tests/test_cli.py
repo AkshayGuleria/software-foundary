@@ -50,3 +50,13 @@ def test_run_auto_approves_gated_steps_for_local_fake_driver_convenience(tmp_pat
     assert result.exit_code == 0, result.output
     run_id = result.output.strip()
     assert len(run_id) == 26
+
+
+def test_archive_events_command_runs_without_error(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+    archive_dir = str(tmp_path / "archive")
+    result = runner.invoke(
+        app,
+        ["archive-events", "--db", db_path, "--archive-dir", archive_dir, "--older-than-days", "30"],
+    )
+    assert result.exit_code == 0
