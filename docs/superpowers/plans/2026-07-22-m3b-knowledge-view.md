@@ -721,8 +721,16 @@ export default function KgGraphView({
       className="rounded border border-slate-800 bg-slate-950"
     >
       {visibleEdges.map((edge) => {
-        const from = positions.get(edge.from);
-        const to = positions.get(edge.to);
+        // The connector must run from the dependency's (edge.to) right edge
+        // to the dependent's (edge.from) left edge, same as DagView's line
+        // rendering (from = needs_unit_id/dependency, to = unit_id/dependent).
+        // computeLevels above positions the dependent (edge.from) at a
+        // higher level/x than the dependency (edge.to); using edge.from as
+        // the "from" endpoint here would draw the line from the dependent's
+        // *far* edge back to the dependency's *far* edge, overshooting both
+        // node boxes instead of spanning just the gap between them.
+        const from = positions.get(edge.to);
+        const to = positions.get(edge.from);
         if (!from || !to) return null;
         return (
           <line

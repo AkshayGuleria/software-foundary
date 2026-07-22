@@ -32,6 +32,26 @@ describe("KgGraphView", () => {
     expect(Number(nodeB.getAttribute("data-x"))).toBeGreaterThan(Number(nodeC.getAttribute("data-x")));
   });
 
+  it("draws the edge connector spanning only the gap between the two node columns", () => {
+    // Regression for a bug introduced when the layout-direction fix (see
+    // "positions an importer strictly after what it imports" above) flipped
+    // computeLevels's keying without correspondingly flipping which node's
+    // near edge each line endpoint uses. Before this test, the connector's
+    // x1/x2 spanned from the far edge of the importer's box back to the far
+    // edge of the imported box (overshooting both nodes) instead of just the
+    // gap between the imported node's right edge and the importer's left edge.
+    render(<KgGraphView nodes={["a.py", "b.py"]} edges={[{ from: "a.py", to: "b.py" }]} />);
+
+    const edge = screen.getByTestId("kg-edge");
+    const nodeA = screen.getByTestId("kg-node-a.py"); // importer, higher level (further right)
+    const nodeB = screen.getByTestId("kg-node-b.py"); // imported, lower level (further left)
+    const bX = Number(nodeB.getAttribute("data-x"));
+    const aX = Number(nodeA.getAttribute("data-x"));
+
+    expect(Number(edge.getAttribute("x1"))).toBe(bX + 140); // b.py's right edge (NODE_WIDTH = 140)
+    expect(Number(edge.getAttribute("x2"))).toBe(aX); // a.py's left edge
+  });
+
   it("marks nodes in the highlight set distinctly", () => {
     render(<KgGraphView nodes={["a.py", "b.py"]} edges={[]} highlight={["a.py"]} />);
 
