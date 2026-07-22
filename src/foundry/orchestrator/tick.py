@@ -208,8 +208,24 @@ class Orchestrator:
                 await self.store.append_event(run_id, unit.id, "gate.approved", {"gate_id": gate.id})
                 self._cleanup_worktree(unit.id)
             elif gate.decision == "rejected":
-                await self.store.update_unit(unit.id, status="ready", attempt=unit.attempt + 1)
-                await self.store.append_event(run_id, unit.id, "gate.rejected", {"gate_id": gate.id})
+                next_attempt = unit.attempt + 1
+                if next_attempt >= unit.max_attempts:
+                    # Same cap-and-escalate idiom as _collect's driver-failure path and
+                    # reconcile's session-crash path: reopening this unit unconditionally
+                    # on every rejection would cycle forever (a stale "rejected" gate
+                    # stays "latest" for this unit -- see latest_by_unit above -- and
+                    # would be reprocessed on every subsequent tick since the unit never
+                    # leaves "blocked"). Creating a fresh pending human gate here makes
+                    # *that* gate the latest going forward, so this branch is not
+                    # revisited until a human actually decides it.
+                    await self.store.update_unit(unit.id, status="blocked", attempt=next_attempt)
+                    await self.store.create_gate(work_unit_id=unit.id, gate_type="human", decision="pending")
+                    await self.store.append_event(run_id, unit.id, "gate.rejected", {"gate_id": gate.id})
+                    await self.store.append_event(run_id, unit.id, "unit.blocked", {"reason": "max_attempts"})
+                    self._cleanup_worktree(unit.id)
+                else:
+                    await self.store.update_unit(unit.id, status="ready", attempt=next_attempt)
+                    await self.store.append_event(run_id, unit.id, "gate.rejected", {"gate_id": gate.id})
 
     async def unblock(self, run_id: str) -> None:
         ready = await self.store.get_ready_units(run_id)

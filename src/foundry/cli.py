@@ -138,14 +138,17 @@ def serve(db: str = "foundry.db", host: str = "127.0.0.1", port: int = 8000) -> 
     asyncio.run(_serve(db, host, port))
 
 
-async def _serve(db: str, host: str, port: int) -> None:
-    engine = make_engine(db)
-    await init_db(engine)
-    store = Store(engine, make_sessionmaker(engine))
-    await store.start()
+async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
+    """Re-register every `status="active"` run with the scheduler on startup.
 
-    scheduler = Scheduler(store)
-
+    Split out from `_serve` so it's directly testable without standing up a
+    live uvicorn server: this is the code path responsible for rehydrating
+    each run's persisted `gate_overrides_json` back into its Orchestrator
+    (via `Scheduler.register`'s `gate_overrides` kwarg) after a restart --
+    without it, a run created with gate overrides would silently lose them
+    and any gate for a step created after the restart would revert to
+    requiring manual approval.
+    """
     active_runs = await store.list_runs(status="active")
     for active_run in active_runs:
         try:
@@ -153,8 +156,22 @@ async def _serve(db: str, host: str, port: int) -> None:
         except (PlaybookLoadError, PlaybookLintError):
             continue  # playbook file moved/changed since the run started; skip, don't crash startup
         script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
-        scheduler.register(active_run.id, FakeDriver(script), playbook)
+        scheduler.register(
+            active_run.id,
+            FakeDriver(script),
+            playbook,
+            gate_overrides=active_run.gate_overrides_json or None,
+        )
 
+
+async def _serve(db: str, host: str, port: int) -> None:
+    engine = make_engine(db)
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+
+    scheduler = Scheduler(store)
+    await _recover_active_runs(store, scheduler)
     await scheduler.start()
 
     api_app = create_app(store, scheduler)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
@@ -25,7 +27,7 @@ class RunCreate(BaseModel):
     project_id: str
     playbook_path: str
     title: str | None = None
-    gate_overrides: dict[str, str] | None = None
+    gate_overrides: dict[str, Literal["approved", "rejected"]] | None = None
 
 
 class RunOut(BaseModel):
