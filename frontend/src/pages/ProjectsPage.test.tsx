@@ -55,4 +55,21 @@ describe("ProjectsPage", () => {
 
     await waitFor(() => expect(screen.getByText("newproj")).toBeInTheDocument());
   });
+
+  it("shows a status pill and pause button for each project", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [{ id: "p1", name: "demo", path: ".", kg_status: "none", status: "active", created_at: "2026-01-01T00:00:00Z" }],
+        paging: {},
+      }),
+    });
+
+    renderWithClient(<ProjectsPage />);
+
+    await waitFor(() => expect(screen.getByText("demo")).toBeInTheDocument());
+    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /pause/i })).toBeInTheDocument();
+  });
 });

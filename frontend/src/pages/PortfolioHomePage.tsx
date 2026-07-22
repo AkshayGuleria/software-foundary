@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { activateProject, archiveProject, pauseProject } from "../api/projects";
+import ProjectLifecycleButtons from "../components/ProjectLifecycleButtons";
 import { getPortfolio } from "../api/portfolio";
 import type { ProjectHealth } from "../api/types";
 
@@ -9,22 +9,6 @@ function formatPercent(value: number | null): string {
 }
 
 function ProjectCard({ project }: { project: ProjectHealth }) {
-  const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["portfolio"] });
-
-  const pauseMutation = useMutation({
-    mutationFn: () => pauseProject(project.project_id),
-    onSuccess: invalidate,
-  });
-  const archiveMutation = useMutation({
-    mutationFn: () => archiveProject(project.project_id),
-    onSuccess: invalidate,
-  });
-  const activateMutation = useMutation({
-    mutationFn: () => activateProject(project.project_id),
-    onSuccess: invalidate,
-  });
-
   return (
     <li
       data-testid={`portfolio-card-${project.project_id}`}
@@ -43,38 +27,11 @@ function ProjectCard({ project }: { project: ProjectHealth }) {
         <span>Rework rate: {formatPercent(project.rework_rate)}</span>
         <span>Budget burn: {formatPercent(project.budget_burn_ratio)}</span>
       </div>
-      <div className="flex gap-2">
-        {project.status !== "paused" && (
-          <button
-            type="button"
-            onClick={() => pauseMutation.mutate()}
-            disabled={pauseMutation.isPending}
-            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-orange-400 hover:text-orange-400"
-          >
-            Pause
-          </button>
-        )}
-        {project.status !== "archived" && (
-          <button
-            type="button"
-            onClick={() => archiveMutation.mutate()}
-            disabled={archiveMutation.isPending}
-            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-orange-400 hover:text-orange-400"
-          >
-            Archive
-          </button>
-        )}
-        {project.status !== "active" && (
-          <button
-            type="button"
-            onClick={() => activateMutation.mutate()}
-            disabled={activateMutation.isPending}
-            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-orange-400 hover:text-orange-400"
-          >
-            Activate
-          </button>
-        )}
-      </div>
+      <ProjectLifecycleButtons
+        projectId={project.project_id}
+        status={project.status}
+        invalidateQueryKey={["portfolio"]}
+      />
     </li>
   );
 }

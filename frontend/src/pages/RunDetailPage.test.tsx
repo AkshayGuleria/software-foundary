@@ -95,4 +95,33 @@ describe("RunDetailPage", () => {
       expect(fetch).toHaveBeenCalledWith("/api/runs/01JR1/cancel", { method: "POST" })
     );
   });
+
+  it("shows the run's pack_version_pin", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === "/api/runs/01JR1") {
+        return Promise.resolve({
+          ok: true, status: 200,
+          json: async () => ({
+            data: {
+              run: {
+                id: "01JR1", project_id: "01JP1", playbook_ref: "demo.toml", title: "demo run", status: "active",
+                pack_version_pin: "default@0.1.0", created_at: "2026-07-21T00:00:00Z",
+              },
+              units: [],
+              gates: [],
+            },
+            paging: {},
+          }),
+        });
+      }
+      if (url === "/api/runs/01JR1/graph") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { units: [], deps: [] }, paging: {} }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+    });
+
+    renderPage("01JR1");
+
+    await waitFor(() => expect(screen.getByText(/default@0\.1\.0/)).toBeInTheDocument());
+  });
 });
