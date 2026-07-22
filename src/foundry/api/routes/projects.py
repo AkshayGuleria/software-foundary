@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from foundry.api.errors import NotFoundError, validate_paging
+from foundry.api.errors import ConflictError, NotFoundError, validate_paging
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.store.models import Project
 from foundry.store.store import Store
@@ -25,6 +25,7 @@ class ProjectOut(BaseModel):
     name: str
     path: str
     kg_status: str
+    status: str
     created_at: str
 
 
@@ -34,6 +35,7 @@ def _to_project_out(p: Project) -> ProjectOut:
         name=p.name,
         path=p.path,
         kg_status=p.kg_status,
+        status=p.status,
         created_at=p.created_at.isoformat(),
     )
 
@@ -64,3 +66,32 @@ async def get_project(project_id: str, request: Request) -> ApiResponse[ProjectO
     if project is None:
         raise NotFoundError(f"Project {project_id} not found")
     return ApiResponse[ProjectOut](data=_to_project_out(project), paging=Paging.none())
+
+
+async def _transition_project(
+    request: Request, project_id: str, target_status: str
+) -> ApiResponse[ProjectOut]:
+    store = _get_store(request)
+    project = await store.get_project(project_id)
+    if project is None:
+        raise NotFoundError(f"Project {project_id} not found")
+    if project.status == target_status:
+        raise ConflictError(f"Project {project_id} is already {target_status}")
+    await store.update_project(project_id, status=target_status)
+    project = await store.get_project(project_id)
+    return ApiResponse[ProjectOut](data=_to_project_out(project), paging=Paging.none())
+
+
+@router.post("/projects/{project_id}/pause")
+async def pause_project(project_id: str, request: Request) -> ApiResponse[ProjectOut]:
+    return await _transition_project(request, project_id, "paused")
+
+
+@router.post("/projects/{project_id}/archive")
+async def archive_project(project_id: str, request: Request) -> ApiResponse[ProjectOut]:
+    return await _transition_project(request, project_id, "archived")
+
+
+@router.post("/projects/{project_id}/activate")
+async def activate_project(project_id: str, request: Request) -> ApiResponse[ProjectOut]:
+    return await _transition_project(request, project_id, "active")

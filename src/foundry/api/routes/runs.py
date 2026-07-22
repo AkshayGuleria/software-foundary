@@ -125,6 +125,8 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
     project = await store.get_project(body.project_id)
     if project is None:
         raise NotFoundError(f"Project {body.project_id} not found")
+    if project.status != "active":
+        raise ConflictError(f"Project {body.project_id} is not active (status: {project.status})")
 
     try:
         playbook = load_playbook(body.playbook_path)

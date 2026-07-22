@@ -40,6 +40,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String, unique=True)
     path: Mapped[str] = mapped_column(String)
     kg_status: Mapped[str] = mapped_column(String, default="none")
+    status: Mapped[str] = mapped_column(String, default="active")
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

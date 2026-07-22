@@ -88,6 +88,16 @@ class Store:
 
         return await self.read(_op)
 
+    async def update_project(self, project_id: str, **fields) -> None:
+        async def _op(session):
+            project = await session.get(Project, project_id)
+            if project is None:
+                raise ValueError(f"Project {project_id} not found")
+            for key, value in fields.items():
+                setattr(project, key, value)
+
+        await self.write(_op)
+
     async def create_run(
         self, project_id: str, playbook_ref: str, title: str, pack_version_pin: str = "local"
     ) -> Run:
