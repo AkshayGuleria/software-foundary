@@ -3,17 +3,21 @@ const NODE_HEIGHT = 32;
 const COL_GAP = 60;
 const ROW_GAP = 14;
 
-// An edge {from, to} means "to" depends on / imports "from" — i.e. "from" must
-// come before "to" in the layout, mirroring DagView's {unit_id, needs_unit_id}
-// (unit_id is the dependent, needs_unit_id is the dependency).
+// An edge {from, to} means "from" imports "to" (matching how the backend
+// builds these edges: from = the importing file, to = the imported file).
+// "from" therefore depends ON "to", exactly like DagView's {unit_id,
+// needs_unit_id} (unit_id is the dependent, needs_unit_id is the dependency)
+// — so the map is keyed by the dependent (edge.from), listing what it
+// depends on (edge.to), and a dependent is positioned strictly after
+// everything it depends on, same convention DagView already established.
 function computeLevels(nodes: string[], edges: { from: string; to: string }[]): Map<string, number> {
   const nodeSet = new Set(nodes);
   const dependsOn: Map<string, string[]> = new Map();
   for (const edge of edges) {
     if (!nodeSet.has(edge.from) || !nodeSet.has(edge.to)) continue;
-    const list = dependsOn.get(edge.to) ?? [];
-    list.push(edge.from);
-    dependsOn.set(edge.to, list);
+    const list = dependsOn.get(edge.from) ?? [];
+    list.push(edge.to);
+    dependsOn.set(edge.from, list);
   }
 
   const levels = new Map<string, number>();

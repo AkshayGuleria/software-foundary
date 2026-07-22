@@ -21,11 +21,15 @@ describe("KgGraphView", () => {
       />
     );
 
+    // a.py imports b.py imports c.py: a.py is the top-level importer (depends
+    // on both b.py and c.py transitively), c.py is the pure leaf dependency
+    // nothing imports further. The importer must land after what it imports,
+    // same convention DagView already established for WorkUnit dependencies.
     const nodeA = screen.getByTestId("kg-node-a.py");
     const nodeB = screen.getByTestId("kg-node-b.py");
     const nodeC = screen.getByTestId("kg-node-c.py");
-    expect(Number(nodeB.getAttribute("data-x"))).toBeGreaterThan(Number(nodeA.getAttribute("data-x")));
-    expect(Number(nodeC.getAttribute("data-x"))).toBeGreaterThan(Number(nodeB.getAttribute("data-x")));
+    expect(Number(nodeA.getAttribute("data-x"))).toBeGreaterThan(Number(nodeB.getAttribute("data-x")));
+    expect(Number(nodeB.getAttribute("data-x"))).toBeGreaterThan(Number(nodeC.getAttribute("data-x")));
   });
 
   it("marks nodes in the highlight set distinctly", () => {
