@@ -265,7 +265,12 @@ async def get_portfolio(request: Request) -> ApiResponse[list[ProjectHealthOut]]
                     decided_count += 1
                     rejected_count += 1
 
-        rework_rate = (rejected_count / decided_count) if decided_count else None
+        # rejected / total-gates-seen-among-active-runs (including still-pending
+        # ones), not rejected/decided-only - a project that's mostly pending with
+        # one rejection should read as a fraction of everything currently open,
+        # not spike to 100% just because nothing else has been decided yet.
+        total_gate_count = pending_gate_count + decided_count
+        rework_rate = (rejected_count / total_gate_count) if total_gate_count else None
 
         total_budget = sum(r.token_budget for r in project_runs)
         total_used = sum(r.tokens_used for r in project_runs)
@@ -280,7 +285,8 @@ async def get_portfolio(request: Request) -> ApiResponse[list[ProjectHealthOut]]
         else:
             staleness_hours = min((now - last_run.created_at).total_seconds() / 3600, _STALENESS_CAP_HOURS)
             attention_score = (
-                pending_gate_count * 10.0
+                active_run_count * 5.0
+                + pending_gate_count * 10.0
                 + (rework_rate or 0.0) * 20.0
                 + (budget_burn_ratio or 0.0) * 15.0
                 + staleness_hours * 0.5
@@ -1221,7 +1227,11 @@ async def test_five_projects_three_active_portfolio_shows_attention_ranked_healt
     assert by_name["project-0"]["active_run_count"] == 1
     assert by_name["project-0"]["pending_gate_count"] == 3
     assert by_name["project-1"]["pending_gate_count"] == 1
-    assert by_name["project-1"]["rework_rate"] == pytest.approx(1.0)
+    # rework_rate = rejected / total-gates-seen-among-active-runs (including
+    # still-pending ones), not rejected/decided-only - confirmed by Task 2's
+    # own review against its test fixture (2 pending + 1 rejected -> 1/3).
+    # Here: 1 pending + 1 rejected -> 1/2.
+    assert by_name["project-1"]["rework_rate"] == pytest.approx(0.5)
     assert by_name["project-2"]["active_run_count"] == 1
     assert by_name["project-2"]["pending_gate_count"] == 0
     assert by_name["project-3"]["active_run_count"] == 0
