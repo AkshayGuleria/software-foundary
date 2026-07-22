@@ -70,7 +70,8 @@ async def get_portfolio(request: Request) -> ApiResponse[list[ProjectHealthOut]]
         else:
             staleness_hours = min((now - last_run.created_at).total_seconds() / 3600, _STALENESS_CAP_HOURS)
             attention_score = (
-                pending_gate_count * 10.0
+                len(active_runs) * 5.0
+                + pending_gate_count * 10.0
                 + (rework_rate or 0.0) * 20.0
                 + (budget_burn_ratio or 0.0) * 15.0
                 + staleness_hours * 0.5

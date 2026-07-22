@@ -66,3 +66,46 @@ async def test_portfolio_project_with_no_runs_has_zero_attention(api_client):
     assert body[0]["last_run_status"] is None
     assert body[0]["last_run_at"] is None
     assert body[0]["attention_score"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_portfolio_active_run_alone_outranks_closed_run(api_client):
+    """Regression test for the missing active_run_count term.
+
+    Two projects with identical (zero) pending-gate/rework/budget signal
+    must still be ranked apart if one has an in-flight active run and the
+    other's only run is closed. Before the fix, both scored ~0 (only
+    differing by sub-millisecond staleness-timer noise between when their
+    fixture runs were created), so an active-but-otherwise-quiet project
+    could not reliably outrank a closed/never-run project. The
+    active_run_count * 5.0 term closes that gap deterministically.
+    """
+    client, store, _scheduler = api_client
+
+    active_project = await store.create_project("active-quiet", ".")
+    closed_project = await store.create_project("closed-quiet", ".")
+
+    # Active project: one open run, zero gates/rework/budget signal.
+    await store.create_run(active_project.id, "p.toml", "active-run")
+
+    # Closed project: one closed run, likewise zero gates/rework/budget signal.
+    closed_run = await store.create_run(closed_project.id, "p.toml", "closed-run")
+    await store.update_run(closed_run.id, status="closed")
+
+    resp = await client.get("/api/portfolio")
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+
+    by_name = {row["name"]: row for row in body}
+    assert by_name["active-quiet"]["active_run_count"] == 1
+    assert by_name["closed-quiet"]["active_run_count"] == 0
+
+    active_score = by_name["active-quiet"]["attention_score"]
+    closed_score = by_name["closed-quiet"]["attention_score"]
+
+    # 1 active run contributes exactly +5.0 (active_run_count * 5.0), which
+    # dwarfs any staleness-timer noise between the two fixture runs (created
+    # microseconds apart, i.e. staleness_hours * 0.5 differs by a
+    # negligible fraction of an hour). Assert a gap well above that noise
+    # floor to prove the new term -- not timing jitter -- drives the result.
+    assert active_score - closed_score > 1.0
