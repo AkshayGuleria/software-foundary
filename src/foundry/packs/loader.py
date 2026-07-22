@@ -3,6 +3,8 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from foundry.packs.schema import PackManifest, RoleSpec
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 
@@ -64,6 +66,6 @@ def list_packs(packs_root: str) -> list[PackManifest]:
             continue
         try:
             manifests.append(load_pack(str(entry)))
-        except (PackLoadError, tomllib.TOMLDecodeError):
+        except (PackLoadError, tomllib.TOMLDecodeError, ValidationError, TypeError):
             continue
     return manifests

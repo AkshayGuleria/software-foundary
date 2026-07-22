@@ -49,3 +49,21 @@ def test_list_packs_scans_subdirectories_and_skips_broken_ones(tmp_path):
 
     manifests = list_packs(str(tmp_path))
     assert [m.id for m in manifests] == ["good"]
+
+
+def test_list_packs_skips_schema_invalid_pack_toml(tmp_path):
+    good_dir = tmp_path / "good_pack"
+    good_dir.mkdir()
+    (good_dir / "pack.toml").write_text('playbooks = []\n\n[pack]\nid = "good"\nversion = "1.0.0"\n')
+
+    # Syntactically valid TOML, but the [[role]] block is missing the
+    # required "id" field, so RoleSpec(**raw_role) raises a Pydantic
+    # ValidationError rather than PackLoadError or a TOML syntax error.
+    schema_invalid_dir = tmp_path / "schema_invalid_pack"
+    schema_invalid_dir.mkdir()
+    (schema_invalid_dir / "pack.toml").write_text(
+        'playbooks = []\n\n[pack]\nid = "schema_invalid"\nversion = "1.0.0"\n\n[[role]]\nmodel = "fake"\n'
+    )
+
+    manifests = list_packs(str(tmp_path))
+    assert [m.id for m in manifests] == ["good"]
