@@ -38,6 +38,9 @@ class RunOut(BaseModel):
     status: str
     created_at: str
     pack_version_pin: str
+    gate_overrides: dict[str, str]
+    token_budget: int
+    tokens_used: int
 
 
 class WorkUnitOut(BaseModel):
@@ -93,6 +96,9 @@ def _to_run_out(r: Run) -> RunOut:
         status=r.status,
         created_at=r.created_at.isoformat(),
         pack_version_pin=r.pack_version_pin,
+        gate_overrides=r.gate_overrides_json,
+        token_budget=r.token_budget,
+        tokens_used=r.tokens_used,
     )
 
 
@@ -142,6 +148,7 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
     await materialize(playbook, run.id, store)
     if body.gate_overrides:
         await store.update_run(run.id, gate_overrides_json=body.gate_overrides)
+        run.gate_overrides_json = body.gate_overrides
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
     scheduler.register(run.id, FakeDriver(script), playbook, gate_overrides=body.gate_overrides)

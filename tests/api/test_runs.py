@@ -284,3 +284,22 @@ async def test_create_run_with_invalid_gate_override_value_returns_400(api_clien
     )
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_run_out_exposes_gate_overrides_and_token_fields(api_client):
+    client, store, _scheduler = api_client
+    project = await store.create_project("demo", ".")
+    resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project.id,
+            "playbook_path": "packs/default/playbooks/bugfix.toml",
+            "gate_overrides": {"diagnose": "approved"},
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()["data"]
+    assert body["gate_overrides"] == {"diagnose": "approved"}
+    assert body["token_budget"] == 0
+    assert body["tokens_used"] == 0

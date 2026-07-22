@@ -63,6 +63,7 @@ export default function RunDetailPage() {
         <div>
           <h2 className="text-xl font-semibold">{detail.run.title}</h2>
           <p className="text-sm text-slate-500">{detail.run.status}</p>
+          <p className="text-xs text-slate-500">Pack: {detail.run.pack_version_pin}</p>
         </div>
         <button
           className="rounded bg-red-900 px-3 py-1.5 text-sm hover:bg-red-800 disabled:opacity-40"

@@ -30,6 +30,7 @@ export interface Project {
   name: string;
   path: string;
   kg_status: string;
+  status: string;
   created_at: string;
 }
 
@@ -39,6 +40,10 @@ export interface Run {
   playbook_ref: string;
   title: string;
   status: string;
+  pack_version_pin: string;
+  gate_overrides: Record<string, string>;
+  token_budget: number;
+  tokens_used: number;
   created_at: string;
 }
 
@@ -121,4 +126,29 @@ export interface KgGraph {
 export interface BlastRadius {
   changed_files: string[];
   radius: string[];
+}
+
+export interface RoleSpec {
+  id: string;
+  model: string;
+}
+
+export interface PackManifest {
+  id: string;
+  version: string;
+  roles: RoleSpec[];
+  playbooks: string[];
+}
+
+export interface ProjectHealth {
+  project_id: string;
+  name: string;
+  status: string;
+  active_run_count: number;
+  pending_gate_count: number;
+  last_run_status: string | null;
+  last_run_at: string | null;
+  rework_rate: number | null;
+  budget_burn_ratio: number | null;
+  attention_score: number;
 }
