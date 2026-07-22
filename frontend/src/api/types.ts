@@ -100,3 +100,25 @@ export interface RunGraph {
   units: WorkUnit[];
   deps: { unit_id: string; needs_unit_id: string }[];
 }
+
+export interface MemoryItem {
+  id: string;
+  scope: string;
+  kind: string;
+  title: string;
+  body_md: string;
+  project_id: string | null;
+  pack_id: string | null;
+  source_run_id: string | null;
+  created_at: string;
+}
+
+export interface KgGraph {
+  nodes: string[];
+  edges: { from: string; to: string }[];
+}
+
+export interface BlastRadius {
+  changed_files: string[];
+  radius: string[];
+}
