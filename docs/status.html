@@ -423,7 +423,7 @@
     <div class="meta-line">
       <span><strong>Repo:</strong> software-foundary</span>
       <span><strong>Design doc:</strong> v1, 2026-07-12</span>
-      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-21 (M1 complete)</span>
+      <span id="updated-line"><strong>Snapshot:</strong> 2026-07-22 (M4a complete)</span>
     </div>
   </header>
 
@@ -480,7 +480,7 @@
   const DATA = {
     stats: [
       { label: "Milestones shipped", value: "4 / 6", accent: false },
-      { label: "Tests passing", value: "162 backend + 50 frontend", done: true },
+      { label: "Tests passing", value: "191 backend + 50 frontend", done: true },
       { label: "Requirements met", value: "8 / 11", accent: false },
       { label: "ADRs accepted", value: "1", accent: false },
     ],
@@ -517,11 +517,11 @@
         ],
       },
       {
-        id: "M4", name: "Packs + portfolio + polish", duration: "2–3 weeks", status: "planned",
-        scope: "Pack manifest + loader + imports + version pinning; extract built‑in SDLC playbook into the default pack; gate‑policy overrides; chat‑to‑role; portfolio home + cross‑project fair scheduling + project lifecycle.",
+        id: "M4", name: "Packs + portfolio + polish", duration: "2–3 weeks", status: "active",
+        scope: "<strong>M4a (packs + engine, done):</strong> pack manifest schema + loader (first‑party, stdlib <code>tomllib</code>, validates every step's <code>role</code> against the pack's declared roles) with zero changes to the existing <code>load_playbook</code>/run‑creation path; the built‑in SDLC playbook extracted into a real, shipped <code>packs/default/</code> (not a test fixture) alongside a second, structurally different bug‑fix playbook added as pure pack content; per‑run pack‑version pinning; per‑run gate‑policy overrides (pre‑decide a gate at run‑creation time, still visible/auditable); project lifecycle (pause/archive/activate, blocks new run creation only); event archival to gzip‑compressed JSONL with hot‑table pruning. <strong>M4b (portfolio + pack viewer dashboard, planned):</strong> pack viewer UI; portfolio home + project view; cross‑project scheduling visibility; chat‑to‑role remains deferred (depends on the still‑unbuilt <code>notes_addressed</code> chat contract, consistent with every prior milestone's deferral).",
         criteria: [
-          { met: false, text: "A second, different playbook added purely as pack content — zero engine changes" },
-          { met: false, text: "Five projects registered, three running concurrently, portfolio home showing attention‑ranked health" },
+          { met: true, text: "A second, different playbook added purely as pack content — zero engine changes — proven both statically (the bug‑fix playbook's diff touches zero files under <code>src/foundry/</code>) and end‑to‑end (an integration test runs it to completion through the real, unmodified orchestrator/store stack on <code>FakeDriver</code>)" },
+          { met: false, text: "Five projects registered, three running concurrently, portfolio home showing attention‑ranked health — M4b" },
         ],
       },
       {
@@ -542,8 +542,8 @@
       { id: "F7", name: "Live visualization", status: "done", milestone: "M1b/M2b/M3b" },
       { id: "F8", name: "Knowledge graph context", status: "partial", milestone: "M3a/M3b → dispatch wiring" },
       { id: "F9", name: "Compounding memory", status: "done", milestone: "M3a" },
-      { id: "F10", name: "Packs", status: "planned", milestone: "M4" },
-      { id: "F11", name: "Multi-project portfolio", status: "partial", milestone: "M0/M1a → M4" },
+      { id: "F10", name: "Packs", status: "partial", milestone: "M4a → M4b viewer UI" },
+      { id: "F11", name: "Multi-project portfolio", status: "partial", milestone: "M0/M1a/M4a lifecycle → M4b portfolio home" },
     ],
     adrs: [
       {
@@ -552,6 +552,8 @@
       },
     ],
     changelog: [
+      { date: "2026-07-22", text: "<strong>M4a (packs + engine) merged to master.</strong> 8-task subagent-driven build: pack manifest schema + loader (role-reference validation) → the built-in SDLC playbook extracted into a real, shipped <code>packs/default/</code> → a second, structurally different bug-fix playbook added as pure pack content (zero files under <code>src/foundry/</code> touched) → per-run pack-version pinning → per-run gate-policy overrides → project lifecycle (pause/archive/activate) → event archival to gzip JSONL → an end-to-end proof test running the bug-fix playbook to completion through the real orchestrator stack. Per-task review found and fixed one Critical bug (Task 7: re-running the <code>archive-events</code> CLI command against an already-archived run silently overwrote its archive file with an empty one on re-invocation — reproduced directly, fixed with an idempotency guard, regression-tested). The final whole-branch review found and fixed two Important cross-task gaps invisible to any single task's diff: server-restart recovery never rehydrated a run's persisted <code>gate_overrides_json</code> when re-registering it with the scheduler (overrides silently stopped working after a restart), and <code>gate_overrides</code> values were unvalidated at the API boundary while the orchestrator's gate-rejection reopen path had no <code>max_attempts</code> cap — unlike every other retry path in the same file — making an unbounded reject/reopen cycle reachable via a bad override value. 191 backend tests. Mid-milestone, an unrelated <code>git pull</code> surfaced that master's history had been rebased upstream (content-identical, confirmed via empty tree diff) by earlier work outside this session; resolved by rebasing the feature branch onto the new tip before merging, rather than force-pushing over it." },
+      { date: "2026-07-22", text: "M4a implementation plan written and approved — split M4 into M4a (packs + engine) and M4b (portfolio + pack-viewer dashboard), same a/b pattern as M1-M3. Scoped out chat-to-role (still blocked on the undesigned <code>notes_addressed</code> chat contract) and deepened cross-project fair scheduling (M2a's <code>GlobalDispatchLimiter</code> already covers ordering; real concurrent dispatch doesn't exist yet, so a second fairness mechanism would be premature)." },
       { date: "2026-07-22", text: "<strong>M3 complete — M3b (knowledge view dashboard) merged to master.</strong> Three real bugs found across per-task and final review, two of them in the same component: <code>KgGraphView</code>'s layered layout rendered importers <em>before</em> their dependencies — backwards from <code>DagView</code>'s established convention — traced to inverted assertions in the plan document's own test, which led the implementer to \"fix\" a correct implementation into an incorrect one to satisfy a wrong test; the final whole-branch review then caught a follow-on bug one layer deeper (the edge-connector line geometry was never updated to match the layout-direction fix, so connectors overshot both node boxes instead of spanning just the gap between them — untested by any prior assertion). Separately, this plan's own end-to-end verification step found a real bug in already-merged M3a code: <code>build_kg</code>'s import resolver returned zero edges when a project's root is the package directory itself (e.g. <code>src/foundry</code>) rather than its parent — the first thing to exercise that exact registration pattern. This does <strong>not</strong> affect or retroactively invalidate M3a's own shipped 38.5%/56.4% token-reduction benchmark numbers, which deliberately root at the package's parent, a configuration M3a's own prior review had already arrived at specifically to sidestep this exact resolution-failure class — confirmed by direct inspection, not just re-running the suite. 162 backend + 50 frontend tests." },
       { date: "2026-07-22", text: "7-task subagent-driven build: <code>GET /api/memory</code> → <code>GET /api/projects/{id}/kg-graph</code> → <code>GET /api/runs/{id}/blast-radius</code> (all three computing on-demand from M3a's KGService/memory store, deliberately not reusing the still-unwired <code>Orchestrator.kg_snapshot</code>, no new <code>/internal</code> surface or auth) → frontend types/API client → <code>KgGraphView</code> (generalized from M2b's <code>DagView</code>) + <code>MemoryBrowser</code> components → <code>/knowledge</code> page composing both → end-to-end manual verification against a real running backend using this repo's own <code>src/foundry</code> tree as the knowledge-graph corpus." },
       { date: "2026-07-22", text: "M3b implementation plan written and approved." },
