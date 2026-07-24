@@ -10,7 +10,6 @@ dependencies = [
     "pydantic>=2.9",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
-    "alembic>=1.13",
     "jsonschema>=4.23",
     "sse-starlette>=2.1",
     "psutil>=6.0",
