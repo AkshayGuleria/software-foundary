@@ -20,3 +20,10 @@ def test_make_driver_codex_builds_a_codex_driver():
 def test_make_driver_rejects_unknown_names():
     with pytest.raises(ValueError, match="unknown driver"):
         make_driver("not-a-real-driver")
+
+
+def test_make_driver_claude_builds_a_claude_code_driver():
+    from foundry.drivers.claude_code import ClaudeCodeDriver
+
+    driver = make_driver("claude")
+    assert isinstance(driver, ClaudeCodeDriver)
