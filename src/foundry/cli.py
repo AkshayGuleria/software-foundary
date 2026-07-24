@@ -181,7 +181,7 @@ async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
             gate_overrides=active_run.gate_overrides_json or None,
             project_path=project_path,
             worktree_manager=WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees")),
-            kg_snapshot=build_kg(project_path),
+            kg_snapshot=await asyncio.to_thread(build_kg, project_path),
             pack=resolve_pack_manifest(active_run.playbook_ref),
         )
 

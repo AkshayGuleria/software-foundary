@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Request, Response
@@ -158,7 +159,7 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
         run.gate_overrides_json = body.gate_overrides
 
     worktree_manager = WorktreeManager(base_dir=f"{project.path}/.foundry/worktrees")
-    kg_snapshot = build_kg(project.path)
+    kg_snapshot = await asyncio.to_thread(build_kg, project.path)
     scheduler.register(
         run.id,
         make_driver(body.driver, playbook),
