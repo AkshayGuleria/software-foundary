@@ -1,4 +1,24 @@
+import subprocess
+
 import pytest
+
+from foundry.orchestrator.worktrees import _git_env
+
+
+def _init_git_repo(path):
+    # Strip repo-scoped GIT_* env vars (GIT_DIR in particular) so `-C <path>`
+    # is authoritative even when this test itself runs inside this repo's own
+    # pre-commit hook, which sets GIT_DIR for its linked-worktree context.
+    # See worktrees.py's _git_env() docstring for the real incident this
+    # guards against.
+    subprocess.run(["git", "init", "-q", str(path)], check=True, env=_git_env())
+    subprocess.run(
+        ["git", "-C", str(path), "config", "user.email", "t@example.com"], check=True, env=_git_env()
+    )
+    subprocess.run(["git", "-C", str(path), "config", "user.name", "t"], check=True, env=_git_env())
+    (path / "README.md").write_text("hi")
+    subprocess.run(["git", "-C", str(path), "add", "."], check=True, env=_git_env())
+    subprocess.run(["git", "-C", str(path), "commit", "-q", "-m", "init"], check=True, env=_git_env())
 
 
 @pytest.mark.asyncio
@@ -303,3 +323,24 @@ async def test_run_out_exposes_gate_overrides_and_token_fields(api_client):
     assert body["gate_overrides"] == {"diagnose": "approved"}
     assert body["token_budget"] == 0
     assert body["tokens_used"] == 0
+
+
+@pytest.mark.asyncio
+async def test_create_run_wires_a_real_worktree_manager(api_client, tmp_path):
+    client, _store, scheduler = api_client
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    proj_resp = await client.post("/api/projects", json={"name": "proj", "path": str(repo)})
+    project_id = proj_resp.json()["data"]["id"]
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={"project_id": project_id, "playbook_path": "tests/fixtures/writes_demo.toml"},
+    )
+    assert run_resp.status_code == 201, run_resp.text
+    run_id = run_resp.json()["data"]["id"]
+
+    orchestrator = scheduler._orchestrators[run_id]
+    assert orchestrator.worktree_manager is not None

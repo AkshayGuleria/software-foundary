@@ -9,7 +9,9 @@ import uvicorn
 from foundry.api.app import create_app
 from foundry.api.scheduler import Scheduler
 from foundry.drivers.fake import FakeDriver, FakeStepScript
+from foundry.kg.service import build_kg
 from foundry.orchestrator.tick import Orchestrator
+from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.packs.resolve import resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
@@ -54,7 +56,16 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
     await materialize(playbook, run_row.id, store)
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
-    orchestrator = Orchestrator(store, FakeDriver(script), playbook)
+    worktree_manager = WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees"))
+    kg_snapshot = build_kg(project_path)
+    orchestrator = Orchestrator(
+        store,
+        FakeDriver(script),
+        playbook,
+        worktree_manager=worktree_manager,
+        project_path=project_path,
+        kg_snapshot=kg_snapshot,
+    )
 
     result = await orchestrator.run_to_completion(run_row.id)
     for _ in range(20):
@@ -155,12 +166,17 @@ async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
             playbook = load_playbook(active_run.playbook_ref)
         except (PlaybookLoadError, PlaybookLintError):
             continue  # playbook file moved/changed since the run started; skip, don't crash startup
+        project = await store.get_project(active_run.project_id)
+        project_path = project.path if project is not None else "."
         script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
         scheduler.register(
             active_run.id,
             FakeDriver(script),
             playbook,
             gate_overrides=active_run.gate_overrides_json or None,
+            project_path=project_path,
+            worktree_manager=WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees")),
+            kg_snapshot=build_kg(project_path),
         )
 
 

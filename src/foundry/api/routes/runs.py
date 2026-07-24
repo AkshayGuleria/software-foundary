@@ -9,7 +9,9 @@ from foundry.api.errors import ConflictError, NotFoundError, ValidationApiError,
 from foundry.api.routes.projects import _get_store
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.drivers.fake import FakeDriver, FakeStepScript
+from foundry.kg.service import build_kg
 from foundry.orchestrator.cost import estimate_plan_cost
+from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.packs.resolve import resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
@@ -151,7 +153,18 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
         run.gate_overrides_json = body.gate_overrides
 
     script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
-    scheduler.register(run.id, FakeDriver(script), playbook, gate_overrides=body.gate_overrides)
+    worktree_manager = WorktreeManager(base_dir=f"{project.path}/.foundry/worktrees")
+    kg_snapshot = build_kg(project.path)
+    scheduler.register(
+        run.id,
+        FakeDriver(script),
+        playbook,
+        project_id=project.id,
+        gate_overrides=body.gate_overrides,
+        project_path=project.path,
+        worktree_manager=worktree_manager,
+        kg_snapshot=kg_snapshot,
+    )
 
     return ApiResponse[RunOut](data=_to_run_out(run), paging=Paging.none())
 
