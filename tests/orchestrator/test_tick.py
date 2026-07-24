@@ -2,8 +2,10 @@ import asyncio
 
 import pytest
 
+from foundry.drivers.base import SessionHandle, SessionSpec
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.tick import Orchestrator
+from foundry.packs.schema import PackManifest, RoleSpec
 from foundry.playbook.loader import load_playbook
 from foundry.playbook.materializer import materialize
 from foundry.playbook.schema import PlaybookSpec
@@ -433,3 +435,43 @@ def test_orchestrator_builds_role_lookup_from_pack():
 def test_orchestrator_role_lookup_empty_without_a_pack():
     orch = Orchestrator(store=None, driver=None, playbook=PlaybookSpec(id="x", steps=[]))
     assert orch._roles_by_id == {}
+
+
+class CapturingDriver(FakeDriver):
+    def __init__(self, script):
+        super().__init__(script)
+        self.captured_specs: list[SessionSpec] = []
+
+    def spawn(self, spec: SessionSpec) -> SessionHandle:
+        self.captured_specs.append(spec)
+        return super().spawn(spec)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_sends_a_real_rendered_prompt_not_a_stub(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("demo3", str(tmp_path))
+    playbook = load_playbook(FIXTURE)
+    run = await store.create_run(project.id, FIXTURE, "demo run 3")
+    await materialize(playbook, run.id, store)
+
+    script = {
+        "plan": FakeStepScript(artifact={"steps": ["a", "b"]}),
+        "implement": FakeStepScript(artifact={"diff": "..."}),
+        "review": FakeStepScript(artifact={"verdict": "ok"}),
+    }
+    driver = CapturingDriver(script)
+    pack = PackManifest(
+        id="test",
+        version="0.1.0",
+        roles=[RoleSpec(id="developer", model="fake", description="Implement the assigned slice.")],
+        playbooks=[],
+    )
+    orchestrator = Orchestrator(store, driver, playbook, pack=pack)
+
+    await orchestrator.run_to_completion(run.id)
+
+    assert any("Implement the assigned slice." in s.prompt for s in driver.captured_specs)
+    assert not any(s.prompt.startswith("step:") and "files:" in s.prompt for s in driver.captured_specs)
+
+    await store.stop()
