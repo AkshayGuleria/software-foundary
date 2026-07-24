@@ -1,8 +1,28 @@
+import os
+import subprocess
+
 from typer.testing import CliRunner
 
 from foundry.cli import app
+from foundry.orchestrator.worktrees import _git_env
 
 runner = CliRunner()
+
+
+def _init_git_repo(path):
+    # Strip repo-scoped GIT_* env vars (GIT_DIR in particular) so `-C <path>`
+    # is authoritative even when this test itself runs inside this repo's own
+    # pre-commit hook, which sets GIT_DIR for its linked-worktree context.
+    # See worktrees.py's _git_env() docstring for the real incident this
+    # guards against.
+    subprocess.run(["git", "init", "-q", str(path)], check=True, env=_git_env())
+    subprocess.run(
+        ["git", "-C", str(path), "config", "user.email", "t@example.com"], check=True, env=_git_env()
+    )
+    subprocess.run(["git", "-C", str(path), "config", "user.name", "t"], check=True, env=_git_env())
+    (path / "README.md").write_text("hi")
+    subprocess.run(["git", "-C", str(path), "add", "."], check=True, env=_git_env())
+    subprocess.run(["git", "-C", str(path), "commit", "-q", "-m", "init"], check=True, env=_git_env())
 
 
 def test_run_then_events_smoke(tmp_path):
@@ -60,3 +80,29 @@ def test_archive_events_command_runs_without_error(tmp_path):
         ["archive-events", "--db", db_path, "--archive-dir", archive_dir, "--older-than-days", "30"],
     )
     assert result.exit_code == 0
+
+
+def test_run_wires_a_real_worktree_manager_for_writes_true_steps(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+    db_path = str(tmp_path / "foundry.db")
+
+    result = runner.invoke(
+        app,
+        ["run", "tests/fixtures/writes_demo.toml", "--project-path", str(repo), "--db", db_path],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert os.path.isdir(repo / ".foundry" / "worktrees")
+
+
+def test_run_wires_the_default_pack_when_playbook_lives_inside_one(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+
+    result = runner.invoke(
+        app,
+        ["run", "packs/default/playbooks/sdlc_story.toml", "--db", db_path, "--project-path", "."],
+    )
+
+    assert result.exit_code == 0, result.output

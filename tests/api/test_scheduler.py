@@ -3,8 +3,10 @@ import pytest
 from foundry.api.scheduler import Scheduler
 from foundry.drivers.base import SessionHealth
 from foundry.drivers.fake import FakeDriver, FakeStepScript
+from foundry.orchestrator.worktrees import WorktreeManager
 from foundry.playbook.loader import load_playbook
 from foundry.playbook.materializer import materialize
+from foundry.playbook.schema import PlaybookSpec
 from foundry.store.db import init_db, make_engine, make_sessionmaker
 from foundry.store.store import Store
 
@@ -130,5 +132,26 @@ async def test_tick_all_once_isolates_a_failing_run_from_the_others(tmp_path):
     assert working_run_row.status == "closed"
 
     assert working_run.id not in scheduler._orchestrators
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_register_wires_worktree_manager_and_kg_snapshot_through(tmp_path):
+    store = await make_store(tmp_path)
+    wtm = WorktreeManager(base_dir=tmp_path / "worktrees")
+
+    scheduler = Scheduler(store)
+    scheduler.register(
+        "run1",
+        FakeDriver({}),
+        PlaybookSpec(id="x", steps=[]),
+        project_path=str(tmp_path),
+        worktree_manager=wtm,
+    )
+
+    orchestrator = scheduler._orchestrators["run1"]
+    assert orchestrator.worktree_manager is wtm
+    assert orchestrator.kg_snapshot is None  # only passed if caller supplies one — this call didn't
 
     await store.stop()

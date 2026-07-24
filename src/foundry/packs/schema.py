@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class RoleSpec(BaseModel):
     id: str
     model: str = "fake"
+    description: str = ""
 
 
 class PackManifest(BaseModel):

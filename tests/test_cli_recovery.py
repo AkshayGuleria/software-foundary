@@ -64,3 +64,20 @@ async def test_recover_active_runs_skips_non_active_runs(tmp_path):
     assert run.id not in scheduler._orchestrators
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_recover_active_runs_reconstructs_the_persisted_driver(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("proj", str(tmp_path))
+    run = await store.create_run(project.id, FIXTURE, "recovered run", driver="codex")
+
+    scheduler = Scheduler(store)
+    await _recover_active_runs(store, scheduler)
+
+    orchestrator = scheduler._orchestrators[run.id]
+    from foundry.drivers.codex import CodexDriver
+
+    assert isinstance(orchestrator.driver, CodexDriver)
+
+    await store.stop()

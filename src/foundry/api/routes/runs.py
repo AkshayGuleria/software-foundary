@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Request, Response
@@ -8,9 +9,11 @@ from pydantic import BaseModel
 from foundry.api.errors import ConflictError, NotFoundError, ValidationApiError, validate_paging
 from foundry.api.routes.projects import _get_store
 from foundry.api.schemas import ApiResponse, Paging
-from foundry.drivers.fake import FakeDriver, FakeStepScript
+from foundry.drivers.factory import make_driver
+from foundry.kg.service import build_kg
 from foundry.orchestrator.cost import estimate_plan_cost
-from foundry.packs.resolve import resolve_pack_version
+from foundry.orchestrator.worktrees import WorktreeManager
+from foundry.packs.resolve import resolve_pack_manifest, resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
@@ -28,6 +31,7 @@ class RunCreate(BaseModel):
     playbook_path: str
     title: str | None = None
     gate_overrides: dict[str, Literal["approved", "rejected"]] | None = None
+    driver: Literal["fake", "codex", "claude"] = "fake"
 
 
 class RunOut(BaseModel):
@@ -41,6 +45,7 @@ class RunOut(BaseModel):
     gate_overrides: dict[str, str]
     token_budget: int
     tokens_used: int
+    driver: str
 
 
 class WorkUnitOut(BaseModel):
@@ -99,6 +104,7 @@ def _to_run_out(r: Run) -> RunOut:
         gate_overrides=r.gate_overrides_json,
         token_budget=r.token_budget,
         tokens_used=r.tokens_used,
+        driver=r.driver,
     )
 
 
@@ -144,14 +150,27 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
 
     title = body.title or playbook.description or playbook.id
     pack_version_pin = resolve_pack_version(body.playbook_path)
-    run = await store.create_run(project.id, body.playbook_path, title, pack_version_pin=pack_version_pin)
+    run = await store.create_run(
+        project.id, body.playbook_path, title, pack_version_pin=pack_version_pin, driver=body.driver
+    )
     await materialize(playbook, run.id, store)
     if body.gate_overrides:
         await store.update_run(run.id, gate_overrides_json=body.gate_overrides)
         run.gate_overrides_json = body.gate_overrides
 
-    script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
-    scheduler.register(run.id, FakeDriver(script), playbook, gate_overrides=body.gate_overrides)
+    worktree_manager = WorktreeManager(base_dir=f"{project.path}/.foundry/worktrees")
+    kg_snapshot = await asyncio.to_thread(build_kg, project.path)
+    scheduler.register(
+        run.id,
+        make_driver(body.driver, playbook),
+        playbook,
+        project_id=project.id,
+        gate_overrides=body.gate_overrides,
+        project_path=project.path,
+        worktree_manager=worktree_manager,
+        kg_snapshot=kg_snapshot,
+        pack=resolve_pack_manifest(body.playbook_path),
+    )
 
     return ApiResponse[RunOut](data=_to_run_out(run), paging=Paging.none())
 

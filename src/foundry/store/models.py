@@ -58,6 +58,7 @@ class Run(Base):
     project_id: Mapped[str] = mapped_column(String, ForeignKey("projects.id"))
     playbook_ref: Mapped[str] = mapped_column(String)
     pack_version_pin: Mapped[str] = mapped_column(String, default="local")
+    driver: Mapped[str] = mapped_column(String, default="fake")
     title: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String, default="active")
     created_by: Mapped[str] = mapped_column(String, default="cli")

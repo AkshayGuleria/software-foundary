@@ -51,6 +51,16 @@ def test_list_packs_scans_subdirectories_and_skips_broken_ones(tmp_path):
     assert [m.id for m in manifests] == ["good"]
 
 
+def test_role_spec_carries_an_optional_description():
+    from foundry.packs.schema import RoleSpec
+
+    role = RoleSpec(id="developer", model="fake", description="Implement the assigned slice.")
+    assert role.description == "Implement the assigned slice."
+
+    bare = RoleSpec(id="developer")
+    assert bare.description == ""
+
+
 def test_list_packs_skips_schema_invalid_pack_toml(tmp_path):
     good_dir = tmp_path / "good_pack"
     good_dir.mkdir()

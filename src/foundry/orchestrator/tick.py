@@ -6,7 +6,9 @@ from foundry.drivers.base import AgentDriver, SessionSpec
 from foundry.kg.memory_retrieval import select_relevant_memory
 from foundry.kg.service import KGSnapshot, blast_radius
 from foundry.orchestrator.budget import check_budget
+from foundry.orchestrator.prompt import render_prompt, render_review_prompt
 from foundry.orchestrator.worktrees import WorktreeManager
+from foundry.packs.schema import PackManifest, RoleSpec
 from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
 from foundry.store.models import Artifact, Gate, Memory, UnitDep, WorkUnit
 from foundry.store.store import Store
@@ -42,6 +44,7 @@ class Orchestrator:
         project_path: str = ".",
         kg_snapshot: KGSnapshot | None = None,
         gate_overrides: dict[str, str] | None = None,
+        pack: PackManifest | None = None,
     ):
         self.store = store
         self.driver = driver
@@ -51,7 +54,9 @@ class Orchestrator:
         self.project_path = project_path
         self.kg_snapshot = kg_snapshot
         self.gate_overrides = gate_overrides or {}
+        self.pack = pack
         self._steps_by_id: dict[str, StepSpec] = {s.id: s for s in playbook.steps}
+        self._roles_by_id: dict[str, RoleSpec] = {r.id: r for r in pack.roles} if pack else {}
         self._unit_worktrees: dict[str, str] = {}
 
     async def tick(self, run_id: str) -> TickResult:
@@ -563,10 +568,14 @@ class Orchestrator:
                 },
             )
 
+            role_spec = self._roles_by_id.get(step.role)
+            model = role_spec.model if role_spec is not None else "fake"
+            prompt = render_prompt(role_spec, step.id, step.produces, bundle_files, memory_items)
+
             spec = SessionSpec(
                 cwd=cwd,
-                prompt=f"step:{step.id} files:{len(bundle_files)} memory:{len(memory_items)}",
-                model="fake",
+                prompt=prompt,
+                model=model,
                 tool_policy={},
                 mcp_servers=[],
                 env={},
@@ -758,10 +767,18 @@ class Orchestrator:
                 continue
             step = self._steps_by_id[unit.step_id]
 
+            role_spec = self._roles_by_id.get(step.role)
+            model = role_spec.model if role_spec is not None else "fake"
+            artifacts = await self.store.list_artifacts(run_id)
+            reviewed_artifact = next((a for a in artifacts if a.id == gate.artifact_id), None)
+            artifact_kind = reviewed_artifact.kind if reviewed_artifact is not None else None
+            artifact_payload = reviewed_artifact.payload_json if reviewed_artifact is not None else {}
+            prompt = render_review_prompt(role_spec, step.id, gate.id, artifact_kind, artifact_payload)
+
             spec = SessionSpec(
                 cwd=".",
-                prompt=f"review:{step.id}:gate:{gate.id}",
-                model="fake",
+                prompt=prompt,
+                model=model,
                 tool_policy={},
                 mcp_servers=[],
                 env={},
