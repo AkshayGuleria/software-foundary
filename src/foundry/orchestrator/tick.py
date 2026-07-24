@@ -7,6 +7,7 @@ from foundry.kg.memory_retrieval import select_relevant_memory
 from foundry.kg.service import KGSnapshot, blast_radius
 from foundry.orchestrator.budget import check_budget
 from foundry.orchestrator.worktrees import WorktreeManager
+from foundry.packs.schema import PackManifest, RoleSpec
 from foundry.playbook.schema import STEP_TYPE_TO_UNIT_TYPE, PlaybookSpec, StepSpec
 from foundry.store.models import Artifact, Gate, Memory, UnitDep, WorkUnit
 from foundry.store.store import Store
@@ -42,6 +43,7 @@ class Orchestrator:
         project_path: str = ".",
         kg_snapshot: KGSnapshot | None = None,
         gate_overrides: dict[str, str] | None = None,
+        pack: PackManifest | None = None,
     ):
         self.store = store
         self.driver = driver
@@ -51,7 +53,9 @@ class Orchestrator:
         self.project_path = project_path
         self.kg_snapshot = kg_snapshot
         self.gate_overrides = gate_overrides or {}
+        self.pack = pack
         self._steps_by_id: dict[str, StepSpec] = {s.id: s for s in playbook.steps}
+        self._roles_by_id: dict[str, RoleSpec] = {r.id: r for r in pack.roles} if pack else {}
         self._unit_worktrees: dict[str, str] = {}
 
     async def tick(self, run_id: str) -> TickResult:
@@ -563,10 +567,13 @@ class Orchestrator:
                 },
             )
 
+            role_spec = self._roles_by_id.get(step.role)
+            model = role_spec.model if role_spec is not None else "fake"
+
             spec = SessionSpec(
                 cwd=cwd,
                 prompt=f"step:{step.id} files:{len(bundle_files)} memory:{len(memory_items)}",
-                model="fake",
+                model=model,
                 tool_policy={},
                 mcp_servers=[],
                 env={},
@@ -758,10 +765,13 @@ class Orchestrator:
                 continue
             step = self._steps_by_id[unit.step_id]
 
+            role_spec = self._roles_by_id.get(step.role)
+            model = role_spec.model if role_spec is not None else "fake"
+
             spec = SessionSpec(
                 cwd=".",
                 prompt=f"review:{step.id}:gate:{gate.id}",
-                model="fake",
+                model=model,
                 tool_policy={},
                 mcp_servers=[],
                 env={},

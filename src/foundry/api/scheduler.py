@@ -6,6 +6,7 @@ from foundry.drivers.base import AgentDriver
 from foundry.kg.service import KGSnapshot
 from foundry.orchestrator.tick import Orchestrator
 from foundry.orchestrator.worktrees import WorktreeManager
+from foundry.packs.schema import PackManifest
 from foundry.playbook.schema import PlaybookSpec
 from foundry.store.models import utcnow
 from foundry.store.store import Store
@@ -75,6 +76,7 @@ class Scheduler:
         project_path: str = ".",
         worktree_manager: WorktreeManager | None = None,
         kg_snapshot: KGSnapshot | None = None,
+        pack: PackManifest | None = None,
     ) -> None:
         self._orchestrators[run_id] = Orchestrator(
             self.store,
@@ -84,6 +86,7 @@ class Scheduler:
             project_path=project_path,
             worktree_manager=worktree_manager,
             kg_snapshot=kg_snapshot,
+            pack=pack,
         )
         if project_id is not None:
             self._project_by_run[run_id] = project_id

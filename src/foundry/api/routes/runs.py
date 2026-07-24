@@ -12,7 +12,7 @@ from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.kg.service import build_kg
 from foundry.orchestrator.cost import estimate_plan_cost
 from foundry.orchestrator.worktrees import WorktreeManager
-from foundry.packs.resolve import resolve_pack_version
+from foundry.packs.resolve import resolve_pack_manifest, resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
@@ -164,6 +164,7 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
         project_path=project.path,
         worktree_manager=worktree_manager,
         kg_snapshot=kg_snapshot,
+        pack=resolve_pack_manifest(body.playbook_path),
     )
 
     return ApiResponse[RunOut](data=_to_run_out(run), paging=Paging.none())

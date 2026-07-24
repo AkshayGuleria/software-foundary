@@ -12,7 +12,7 @@ from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.kg.service import build_kg
 from foundry.orchestrator.tick import Orchestrator
 from foundry.orchestrator.worktrees import WorktreeManager
-from foundry.packs.resolve import resolve_pack_version
+from foundry.packs.resolve import resolve_pack_manifest, resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
@@ -65,6 +65,7 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
         worktree_manager=worktree_manager,
         project_path=project_path,
         kg_snapshot=kg_snapshot,
+        pack=resolve_pack_manifest(playbook_path),
     )
 
     result = await orchestrator.run_to_completion(run_row.id)
@@ -177,6 +178,7 @@ async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
             project_path=project_path,
             worktree_manager=WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees")),
             kg_snapshot=build_kg(project_path),
+            pack=resolve_pack_manifest(active_run.playbook_ref),
         )
 
 

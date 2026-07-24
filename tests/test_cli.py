@@ -95,3 +95,14 @@ def test_run_wires_a_real_worktree_manager_for_writes_true_steps(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert os.path.isdir(repo / ".foundry" / "worktrees")
+
+
+def test_run_wires_the_default_pack_when_playbook_lives_inside_one(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+
+    result = runner.invoke(
+        app,
+        ["run", "packs/default/playbooks/sdlc_story.toml", "--db", db_path, "--project-path", "."],
+    )
+
+    assert result.exit_code == 0, result.output

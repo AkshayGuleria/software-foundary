@@ -6,6 +6,7 @@ from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.tick import Orchestrator
 from foundry.playbook.loader import load_playbook
 from foundry.playbook.materializer import materialize
+from foundry.playbook.schema import PlaybookSpec
 from foundry.store.db import init_db, make_engine, make_sessionmaker
 from foundry.store.models import WorkUnit
 from foundry.store.store import Store
@@ -414,3 +415,21 @@ async def test_reject_then_rework_increments_artifact_version(tmp_path):
     assert a_artifacts[1].payload_json == {"round": 2}
 
     await store.stop()
+
+
+def test_orchestrator_builds_role_lookup_from_pack():
+    from foundry.packs.schema import PackManifest, RoleSpec
+
+    pack = PackManifest(
+        id="default",
+        version="0.1.0",
+        roles=[RoleSpec(id="developer", model="sonnet-latest", description="Implement things.")],
+        playbooks=[],
+    )
+    orch = Orchestrator(store=None, driver=None, playbook=PlaybookSpec(id="x", steps=[]), pack=pack)
+    assert orch._roles_by_id["developer"].model == "sonnet-latest"
+
+
+def test_orchestrator_role_lookup_empty_without_a_pack():
+    orch = Orchestrator(store=None, driver=None, playbook=PlaybookSpec(id="x", steps=[]))
+    assert orch._roles_by_id == {}
