@@ -38,4 +38,16 @@ describe("RunsHomePage", () => {
     await waitFor(() => expect(screen.getByText("demo run")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: /demo run/i })).toHaveAttribute("href", "/runs/01JR1");
   });
+
+  it("shows a link to the metrics page when filtered by project", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200, json: async () => ({ data: [], paging: {} }),
+    });
+
+    renderWithProviders(["/runs?project_id=01JP1"]);
+
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: /view portfolio metrics/i })).toHaveAttribute("href", "/metrics"),
+    );
+  });
 });
