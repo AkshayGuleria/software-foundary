@@ -8,7 +8,7 @@ import uvicorn
 
 from foundry.api.app import create_app
 from foundry.api.scheduler import Scheduler
-from foundry.drivers.fake import FakeDriver, FakeStepScript
+from foundry.drivers.factory import make_driver
 from foundry.kg.service import build_kg
 from foundry.orchestrator.tick import Orchestrator
 from foundry.orchestrator.worktrees import WorktreeManager
@@ -23,8 +23,8 @@ app = typer.Typer()
 
 
 @app.command()
-def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db") -> None:
-    run_id, complete, pending_count = asyncio.run(_run(playbook_path, project_path, db))
+def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db", driver: str = "fake") -> None:
+    run_id, complete, pending_count = asyncio.run(_run(playbook_path, project_path, db, driver))
     if not complete:
         typer.echo(
             f"run {run_id} did not complete: {pending_count} unit(s) still pending (check gates/human_tasks)",
@@ -34,7 +34,9 @@ def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db") -> 
     typer.echo(run_id)
 
 
-async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, bool, int]:
+async def _run(
+    playbook_path: str, project_path: str, db: str, driver_name: str = "fake"
+) -> tuple[str, bool, int]:
     engine = make_engine(db)
     await init_db(engine)
     store = Store(engine, make_sessionmaker(engine))
@@ -51,16 +53,19 @@ async def _run(playbook_path: str, project_path: str, db: str) -> tuple[str, boo
     pack_version_pin = resolve_pack_version(playbook_path)
     project = await store.create_project(playbook.id, project_path)
     run_row = await store.create_run(
-        project.id, playbook_path, playbook.description or playbook.id, pack_version_pin=pack_version_pin
+        project.id,
+        playbook_path,
+        playbook.description or playbook.id,
+        pack_version_pin=pack_version_pin,
+        driver=driver_name,
     )
     await materialize(playbook, run_row.id, store)
 
-    script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
     worktree_manager = WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees"))
     kg_snapshot = build_kg(project_path)
     orchestrator = Orchestrator(
         store,
-        FakeDriver(script),
+        make_driver(driver_name, playbook),
         playbook,
         worktree_manager=worktree_manager,
         project_path=project_path,
@@ -169,10 +174,9 @@ async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
             continue  # playbook file moved/changed since the run started; skip, don't crash startup
         project = await store.get_project(active_run.project_id)
         project_path = project.path if project is not None else "."
-        script = {step.id: FakeStepScript(artifact={"ok": True}) for step in playbook.steps}
         scheduler.register(
             active_run.id,
-            FakeDriver(script),
+            make_driver(active_run.driver, playbook),
             playbook,
             gate_overrides=active_run.gate_overrides_json or None,
             project_path=project_path,

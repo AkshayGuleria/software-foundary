@@ -49,6 +49,25 @@ async def test_create_run_materializes_and_registers_with_scheduler(api_client):
 
 
 @pytest.mark.asyncio
+async def test_create_run_accepts_and_persists_a_driver_choice(api_client):
+    client, _store, _scheduler = api_client
+
+    proj_resp = await client.post("/api/projects", json={"name": "proj", "path": "/tmp/proj"})
+    project_id = proj_resp.json()["data"]["id"]
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project_id,
+            "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml",
+            "driver": "codex",
+        },
+    )
+    assert run_resp.status_code == 201, run_resp.text
+    assert run_resp.json()["data"]["driver"] == "codex"
+
+
+@pytest.mark.asyncio
 async def test_create_run_with_bad_playbook_returns_400(api_client):
     client, _store, _scheduler = api_client
 

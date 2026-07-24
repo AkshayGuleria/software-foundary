@@ -103,7 +103,12 @@ class Store:
         await self.write(_op)
 
     async def create_run(
-        self, project_id: str, playbook_ref: str, title: str, pack_version_pin: str = "local"
+        self,
+        project_id: str,
+        playbook_ref: str,
+        title: str,
+        pack_version_pin: str = "local",
+        driver: str = "fake",
     ) -> Run:
         async def _op(session):
             run = Run(
@@ -111,6 +116,7 @@ class Store:
                 playbook_ref=playbook_ref,
                 title=title,
                 pack_version_pin=pack_version_pin,
+                driver=driver,
             )
             session.add(run)
             await session.flush()
