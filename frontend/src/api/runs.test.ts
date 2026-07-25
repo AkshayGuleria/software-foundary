@@ -36,6 +36,18 @@ describe("runs API", () => {
     expect(run.id).toBe("01JR1");
   });
 
+  it("createRun includes driver in the request body when provided", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 201, json: async () => ({ data: sampleRun, paging: {} }) });
+
+    await createRun({ project_id: "01JP1", playbook_path: "demo.toml", driver: "codex" });
+
+    expect(fetch).toHaveBeenCalledWith("/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_id: "01JP1", playbook_path: "demo.toml", driver: "codex" }),
+    });
+  });
+
   it("getRunDetail GETs /api/runs/{id}", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: { run: sampleRun, units: [], gates: [] }, paging: {} }) });
     const detail = await getRunDetail("01JR1");

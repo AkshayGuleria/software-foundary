@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Project } from "../api/types";
 
 export default function NewRunForm({
@@ -8,18 +8,27 @@ export default function NewRunForm({
 }: {
   projects: Project[];
   defaultProjectId?: string;
-  onSubmit: (input: { project_id: string; playbook_path: string; title?: string }) => void;
+  onSubmit: (input: { project_id: string; playbook_path: string; title?: string; driver?: string }) => void;
 }) {
   const [projectId, setProjectId] = useState(defaultProjectId ?? projects[0]?.id ?? "");
   const [playbookPath, setPlaybookPath] = useState("");
   const [title, setTitle] = useState("");
+  const [driver, setDriver] = useState("fake");
+
+  useEffect(() => {
+    const selected = projects.find((p) => p.id === projectId);
+    if (selected) {
+      setDriver(selected.default_driver);
+      setPlaybookPath(selected.default_playbook_path ?? "");
+    }
+  }, [projectId, projects]);
 
   return (
     <form
       className="flex flex-wrap items-end gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ project_id: projectId, playbook_path: playbookPath, title: title || undefined });
+        onSubmit({ project_id: projectId, playbook_path: playbookPath, title: title || undefined, driver });
         setPlaybookPath("");
         setTitle("");
       }}
@@ -37,6 +46,18 @@ export default function NewRunForm({
               {p.name}
             </option>
           ))}
+        </select>
+      </label>
+      <label className="flex flex-col text-sm">
+        Driver
+        <select
+          className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
+          value={driver}
+          onChange={(e) => setDriver(e.target.value)}
+        >
+          <option value="fake">fake</option>
+          <option value="codex">codex</option>
+          <option value="claude">claude</option>
         </select>
       </label>
       <label className="flex flex-col text-sm">
