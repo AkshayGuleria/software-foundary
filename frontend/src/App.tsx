@@ -6,6 +6,7 @@ import PacksPage from "./pages/PacksPage";
 import PortfolioHomePage from "./pages/PortfolioHomePage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import QueuePage from "./pages/QueuePage";
 import RunDetailPage from "./pages/RunDetailPage";
 import RunsHomePage from "./pages/RunsHomePage";
 
@@ -17,6 +18,9 @@ export default function App() {
         <nav className="flex gap-3 text-sm">
           <NavLink to="/" end className="text-slate-400 hover:text-orange-400">
             Portfolio
+          </NavLink>
+          <NavLink to="/queue" className="text-slate-400 hover:text-orange-400">
+            Queue
           </NavLink>
           <NavLink to="/projects" className="text-slate-400 hover:text-orange-400">
             Projects
@@ -41,6 +45,7 @@ export default function App() {
       <main className="p-6">
         <Routes>
           <Route path="/" element={<PortfolioHomePage />} />
+          <Route path="/queue" element={<QueuePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/runs" element={<RunsHomePage />} />

@@ -155,3 +155,31 @@ export interface ProjectHealth {
   budget_burn_ratio: number | null;
   attention_score: number;
 }
+
+export interface GateQueueItem {
+  id: string;
+  work_unit_id: string;
+  gate_type: string;
+  project_id: string;
+  project_name: string;
+  run_id: string;
+  run_title: string;
+  step_id: string;
+  created_at: string;
+}
+
+export interface HumanTaskQueueItem {
+  id: string;
+  project_id: string;
+  project_name: string;
+  run_id: string;
+  run_title: string;
+  step_id: string;
+  reason: string;
+  created_at: string;
+}
+
+export interface Queue {
+  gates: GateQueueItem[];
+  human_tasks: HumanTaskQueueItem[];
+}
