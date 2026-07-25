@@ -248,3 +248,20 @@ async def test_create_run_persists_driver_name(tmp_path):
     assert default_run.driver == "fake"
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_create_run_persists_token_budget(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("p", str(tmp_path))
+
+    run = await store.create_run(project.id, "playbook.toml", "title", token_budget=25000)
+    assert run.token_budget == 25000
+
+    fetched = await store.get_run(run.id)
+    assert fetched.token_budget == 25000
+
+    default_run = await store.create_run(project.id, "playbook2.toml", "title2")
+    assert default_run.token_budget == 0
+
+    await store.stop()

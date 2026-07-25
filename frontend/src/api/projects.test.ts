@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { activateProject, archiveProject, createProject, getProject, listProjects, pauseProject } from "./projects";
+import {
+  activateProject,
+  archiveProject,
+  createProject,
+  getProject,
+  listProjects,
+  pauseProject,
+  updateProjectSettings,
+} from "./projects";
 
 describe("projects API", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
@@ -102,5 +110,32 @@ describe("getProject", () => {
 
     expect(project.name).toBe("acme");
     expect(fetch).toHaveBeenCalledWith("/api/projects/p1", undefined);
+  });
+});
+
+describe("updateProjectSettings", () => {
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("PATCHes only the provided fields", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({
+        data: {
+          id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active",
+          created_at: "2026-07-21T00:00:00Z", default_driver: "codex", default_token_budget: 0,
+          default_playbook_path: null,
+        },
+        paging: {},
+      }),
+    });
+
+    const project = await updateProjectSettings("p1", { driver: "codex" });
+
+    expect(project.default_driver).toBe("codex");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/projects/p1/settings",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ driver: "codex" }) }),
+    );
   });
 });

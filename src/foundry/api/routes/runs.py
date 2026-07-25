@@ -32,6 +32,7 @@ class RunCreate(BaseModel):
     title: str | None = None
     gate_overrides: dict[str, Literal["approved", "rejected"]] | None = None
     driver: Literal["fake", "codex", "claude"] = "fake"
+    token_budget: int | None = None
 
 
 class RunOut(BaseModel):
@@ -150,8 +151,16 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
 
     title = body.title or playbook.description or playbook.id
     pack_version_pin = resolve_pack_version(body.playbook_path)
+    effective_token_budget = (
+        body.token_budget if body.token_budget is not None else project.default_token_budget
+    )
     run = await store.create_run(
-        project.id, body.playbook_path, title, pack_version_pin=pack_version_pin, driver=body.driver
+        project.id,
+        body.playbook_path,
+        title,
+        pack_version_pin=pack_version_pin,
+        driver=body.driver,
+        token_budget=effective_token_budget,
     )
     await materialize(playbook, run.id, store)
     if body.gate_overrides:

@@ -10,7 +10,12 @@ export async function listRuns(params?: { project_id?: string; status?: string }
   return res.data;
 }
 
-export async function createRun(input: { project_id: string; playbook_path: string; title?: string }): Promise<Run> {
+export async function createRun(input: {
+  project_id: string;
+  playbook_path: string;
+  title?: string;
+  driver?: string;
+}): Promise<Run> {
   const res = await apiFetch<Run>("/api/runs", {
     method: "POST",
     headers: { "content-type": "application/json" },

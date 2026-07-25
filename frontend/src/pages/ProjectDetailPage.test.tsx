@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "./ProjectDetailPage";
@@ -174,5 +175,45 @@ describe("ProjectDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("a.py")).toBeInTheDocument());
     expect(screen.getByText("Watch the pgid")).toBeInTheDocument();
+  });
+
+  it("submits updated settings and reflects the new values", async () => {
+    let currentDriver = "fake";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/projects/p1" || url === "/api/projects/p1/settings") {
+          if (init?.method === "PATCH") {
+            currentDriver = "codex";
+          }
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: {
+                id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active",
+                created_at: "2026-07-21T00:00:00Z", default_driver: currentDriver,
+                default_token_budget: 0, default_playbook_path: null,
+              },
+              paging: {},
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }),
+    );
+
+    renderWithProviders("p1");
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByLabelText(/driver/i)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/driver/i), "codex");
+    await user.click(screen.getByRole("button", { name: /save settings/i }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/projects/p1/settings",
+        expect.objectContaining({ method: "PATCH" }),
+      ),
+    );
   });
 });

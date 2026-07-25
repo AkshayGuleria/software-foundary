@@ -363,3 +363,39 @@ async def test_create_run_wires_a_real_worktree_manager(api_client, tmp_path):
 
     orchestrator = scheduler._orchestrators[run_id]
     assert orchestrator.worktree_manager is not None
+
+
+@pytest.mark.asyncio
+async def test_create_run_applies_project_default_token_budget(api_client):
+    client, _store, _scheduler = api_client
+
+    proj_resp = await client.post("/api/projects", json={"name": "budgetproj", "path": "/tmp/budgetproj"})
+    project_id = proj_resp.json()["data"]["id"]
+    await client.patch(f"/api/projects/{project_id}/settings", json={"token_budget": 30000})
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={"project_id": project_id, "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml"},
+    )
+    assert run_resp.status_code == 201, run_resp.text
+    assert run_resp.json()["data"]["token_budget"] == 30000
+
+
+@pytest.mark.asyncio
+async def test_create_run_explicit_token_budget_overrides_project_default(api_client):
+    client, _store, _scheduler = api_client
+
+    proj_resp = await client.post("/api/projects", json={"name": "budgetproj2", "path": "/tmp/budgetproj2"})
+    project_id = proj_resp.json()["data"]["id"]
+    await client.patch(f"/api/projects/{project_id}/settings", json={"token_budget": 30000})
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project_id,
+            "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml",
+            "token_budget": 5000,
+        },
+    )
+    assert run_resp.status_code == 201, run_resp.text
+    assert run_resp.json()["data"]["token_budget"] == 5000
