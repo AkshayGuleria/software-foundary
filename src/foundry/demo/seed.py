@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
 
 from foundry.demo.toy_repo import generate_toy_repo
 from foundry.drivers.fake import FakeDriver, FakeStepScript
 from foundry.orchestrator.tick import Orchestrator, TickResult
 from foundry.playbook.loader import load_playbook
 from foundry.playbook.materializer import materialize
+from foundry.store.models import utcnow
 from foundry.store.store import Store
 
 SDLC_PLAYBOOK = "packs/default/playbooks/sdlc_story.toml"
@@ -41,21 +41,18 @@ async def _run_to_pending_or_completion(
     amount of further ticking will resolve on its own).
     """
     result = TickResult(dispatched=0, closed=0, failed=0, complete=False)
-    previous_progress = -1
+    previous_progress = None
     for _ in range(max_ticks):
         result = await orchestrator.tick(run_id)
-        current_progress = result.closed + result.failed
-        # Check if run has no pending units
         units = await store.list_units(run_id)
         pending = [u for u in units if u.status not in ("closed", "failed", "blocked")]
         if not pending:
             result.complete = True
             return result
-        # Check if two consecutive ticks made no progress
-        if current_progress == 0 and previous_progress == 0:
+        current_progress = result.closed + result.failed
+        if current_progress == previous_progress:
             break
         previous_progress = current_progress
-    # Set complete based on final state
     units = await store.list_units(run_id)
     pending = [u for u in units if u.status not in ("closed", "failed", "blocked")]
     result.complete = not pending
@@ -109,7 +106,7 @@ async def _seed_closed_successful_run(store: Store, project, project_dir: str) -
     task_units = [u for u in units if u.type == "task"]
     if task_units and all(u.status == "closed" for u in task_units):
         # Close the run now that all tasks are complete
-        await store.update_run(run.id, status="closed", closed_at=datetime.now(UTC))
+        await store.update_run(run.id, status="closed", closed_at=utcnow())
 
 
 async def run_demo_seed(store: Store, base_dir: str) -> None:
