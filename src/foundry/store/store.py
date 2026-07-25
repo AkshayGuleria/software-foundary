@@ -109,6 +109,7 @@ class Store:
         title: str,
         pack_version_pin: str = "local",
         driver: str = "fake",
+        token_budget: int = 0,
     ) -> Run:
         async def _op(session):
             run = Run(
@@ -117,6 +118,7 @@ class Store:
                 title=title,
                 pack_version_pin=pack_version_pin,
                 driver=driver,
+                token_budget=token_budget,
             )
             session.add(run)
             await session.flush()
