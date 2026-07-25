@@ -51,3 +51,22 @@ async def test_seed_creates_runs_with_pending_human_and_agent_gates(tmp_path):
     assert pending_agent, "expected at least one pending agent gate in the seed data"
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_seed_creates_a_rejection_rework_run_and_a_cancelled_run(tmp_path):
+    store = await _make_store(tmp_path)
+
+    await run_demo_seed(store, str(tmp_path / "demo-repos"))
+
+    all_gates = []
+    for run in await store.list_runs():
+        all_gates.extend(await store.list_gates_for_run(run.id))
+    rejected_gates = [g for g in all_gates if g.decision == "rejected"]
+    assert rejected_gates, "expected at least one rejected gate in the seed data's history"
+
+    all_runs = await store.list_runs()
+    cancelled_runs = [r for r in all_runs if r.status == "cancelled"]
+    assert cancelled_runs, "expected at least one cancelled run"
+
+    await store.stop()

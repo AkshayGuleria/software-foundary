@@ -174,6 +174,111 @@ async def _seed_active_pending_agent_gate_run(store: Store, project, project_dir
         await _run_to_pending_or_completion(store, run.id, orchestrator)
 
 
+async def _seed_rejection_rework_run(store: Store, project, project_dir: str) -> None:
+    """SDLC run whose review gate is rejected once, then approved on rework.
+
+    The original plan for this seed run was to preempt the driver with a
+    direct `store.decide_gate(..., "rejected", ...)` write, timed to land
+    while the gate was briefly observably pending (the same
+    `dispatch_agent_reviews=False` trick `_ReviewGateHoldOrchestrator` uses
+    above). That doesn't actually get you a genuine reject-THEN-rework
+    sequence: `apply_gate_decisions()` only reopens the *gate's own*
+    work unit (the review task) on a rejection -- reopening the *upstream*
+    `implement` unit the review is actually judging is extra logic that
+    lives inside `_dispatch_agent_reviews` itself (see tick.py's
+    `back_to_unit` handling, driven by the playbook's `loop.back_to`). A
+    direct write bypasses that method entirely, so nothing would ever
+    reopen `implement` for rework -- the "rework" half of this seed run's
+    name would be a lie.
+
+    The actual fix needs BOTH decisions to flow through the real
+    `_dispatch_agent_reviews` path, just with different verdicts on each
+    round. `FakeDriver.script` is a plain dict keyed by step_id -- nothing
+    stops a caller from mutating it between ticks. So this driver gets its
+    own shallow copy (mutating the shared `_HAPPY_PATH_SCRIPT` dict in
+    place would leak into every other seed run built from it) with the
+    "review" step's script swapped to a non-"approved" verdict for round 1.
+    Ticking then drives review to a genuine "rejected" decision through
+    `_dispatch_agent_reviews`, which reopens `implement` via `loop.back_to`
+    on its own. Once that's happened, the script is flipped back to
+    "approved" so round 2's review -- the exact same code path -- passes,
+    and the run finishes out normally. No orchestrator subclassing, no
+    direct gate-decision write racing the driver.
+
+    One more wrinkle: the approve-and-advance loop below ticks the
+    orchestrator one `tick()` at a time rather than via
+    `_run_to_pending_or_completion`. With the script still scripted to
+    reject, that helper's multi-tick convergence loop would happily cycle
+    reject->rework repeatedly -- each cycle still closes/reopens task
+    units, which reads as "progress" and never trips its stall check -- all
+    the way up to the review step's own `loop.max_rounds` cap, instead of
+    stopping after exactly the one round this seed run wants. Ticking once
+    at a time lets the script be flipped back to "approved" the instant the
+    first rejection is observed.
+    """
+    playbook = load_playbook(SDLC_PLAYBOOK)
+    run = await store.create_run(project.id, SDLC_PLAYBOOK, "Add bulk delete to the reports page")
+    await materialize(playbook, run.id, store)
+
+    # Shallow copy -- see docstring -- so mutating "review" below doesn't
+    # affect `_HAPPY_PATH_SCRIPT` or any other seed run sharing it.
+    script = dict(_HAPPY_PATH_SCRIPT)
+    script["review"] = FakeStepScript(artifact={"verdict": "needs_changes"})
+    driver = FakeDriver(script)
+    orchestrator = Orchestrator(store, driver, playbook, project_path=project_dir)
+    await _run_to_pending_or_completion(store, run.id, orchestrator)
+
+    # Approve human/derived gates one single tick at a time -- deliberately
+    # NOT via _run_to_pending_or_completion's multi-tick convergence loop
+    # here. With the script still scripted to reject, that loop would keep
+    # cycling reject->rework indefinitely: each cycle still closes/reopens
+    # task units, which counts as "progress" and never trips its stall
+    # check, so it would run all the way up to the review step's own
+    # loop.max_rounds cap instead of stopping after exactly one round. One
+    # tick at a time lets this catch the review step's FIRST rejection
+    # (fired for real, through _dispatch_agent_reviews, the same tick it
+    # dispatches review) and flip the script back to "approved" right
+    # after -- before a second reject-rework round gets a chance to run.
+    for _ in range(15):
+        gates = await store.list_gates_for_run(run.id)
+        pending = [g for g in gates if g.decision == "pending"]
+        approvable = [g for g in pending if g.artifact_id is not None or g.gate_type == "derived"]
+        for gate in approvable:
+            await store.decide_gate(gate.id, "approved", decided_by="demo-seed")
+        await orchestrator.tick(run.id)
+
+        gates = await store.list_gates_for_run(run.id)
+        if any(g.decision == "rejected" for g in gates):
+            driver.script["review"] = FakeStepScript(artifact={"verdict": "approved"})
+            break
+
+    # Round 2: implement re-dispatches (it was reopened by the rejection's
+    # loop.back_to handling), a fresh review gate opens, and this time the
+    # now-"approved" script drives the normal agent-auto-decide path via
+    # the same _dispatch_agent_reviews code as round 1 -- through to the
+    # human gate at integrate.
+    await _auto_approve_and_complete(store, run.id, orchestrator)
+
+
+async def _seed_cancelled_run(store: Store, project, project_dir: str) -> None:
+    """A run cancelled mid-flight -- direct writes, matching how the real
+    POST /runs/{id}/cancel route does it (src/foundry/api/routes/runs.py).
+    """
+    playbook = load_playbook(BUGFIX_PLAYBOOK)
+    run = await store.create_run(project.id, BUGFIX_PLAYBOOK, "Investigate slow report generation")
+    await materialize(playbook, run.id, store)
+
+    driver = FakeDriver(_HAPPY_PATH_SCRIPT)
+    orchestrator = Orchestrator(store, driver, playbook, project_path=project_dir)
+    await orchestrator.tick(run.id)  # get it started, a unit or two in progress
+
+    units = await store.list_units(run.id)
+    for unit in units:
+        if unit.status not in ("closed", "failed", "killed", "cancelled"):
+            await store.update_unit(unit.id, status="killed")
+    await store.update_run(run.id, status="cancelled")
+
+
 class _ReviewGateHoldOrchestrator(Orchestrator):
     """Orchestrator whose tick() never auto-resolves agent-type review gates.
 
@@ -206,3 +311,9 @@ async def run_demo_seed(store: Store, base_dir: str) -> None:
     beta = await store.create_project("beta-dashboard", beta_dir)
     await _seed_active_pending_human_gate_run(store, beta, beta_dir)
     await _seed_active_pending_agent_gate_run(store, beta, beta_dir)
+
+    gamma_dir = os.path.join(base_dir, "gamma-api")
+    generate_toy_repo(gamma_dir, num_files=10)
+    gamma = await store.create_project("gamma-api", gamma_dir)
+    await _seed_rejection_rework_run(store, gamma, gamma_dir)
+    await _seed_cancelled_run(store, gamma, gamma_dir)
