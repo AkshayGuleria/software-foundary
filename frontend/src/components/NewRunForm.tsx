@@ -21,7 +21,13 @@ export default function NewRunForm({
       setDriver(selected.default_driver);
       setPlaybookPath(selected.default_playbook_path ?? "");
     }
-  }, [projectId, projects]);
+    // Intentionally omit `projects` from deps: a background refetch of the
+    // projects query (e.g. react-query's refetchOnWindowFocus) produces a
+    // new array reference with equivalent content, which would otherwise
+    // re-run this effect and silently reset the user's edits even though
+    // they never changed the selected project. The effect body still reads
+    // the latest `projects` via closure.
+  }, [projectId]);
 
   return (
     <form

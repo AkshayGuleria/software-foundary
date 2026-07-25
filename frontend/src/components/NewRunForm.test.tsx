@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import type { Project } from "../api/types";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import NewRunForm from "./NewRunForm";
@@ -30,5 +31,29 @@ describe("NewRunForm", () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ project_id: "p1", driver: "claude" }),
     );
+  });
+
+  it("does not reset user edits when the projects array is replaced with an equivalent one (e.g. background refetch)", async () => {
+    const { rerender } = render(
+      <NewRunForm projects={projects} defaultProjectId="p1" onSubmit={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+
+    // User edits the pre-filled values away from the project's defaults.
+    await user.selectOptions(screen.getByLabelText(/driver/i), "claude");
+    const playbookInput = screen.getByLabelText(/playbook path/i);
+    await user.clear(playbookInput);
+    await user.type(playbookInput, "custom/path.toml");
+
+    expect(screen.getByLabelText(/driver/i)).toHaveValue("claude");
+    expect(playbookInput).toHaveValue("custom/path.toml");
+
+    // Simulate a background refetch of the projects query: same data, new
+    // array (and object) references, projectId unchanged.
+    const refetchedProjects: Project[] = projects.map((p) => ({ ...p }));
+    rerender(<NewRunForm projects={refetchedProjects} defaultProjectId="p1" onSubmit={vi.fn()} />);
+
+    expect(screen.getByLabelText(/driver/i)).toHaveValue("claude");
+    expect(screen.getByLabelText(/playbook path/i)).toHaveValue("custom/path.toml");
   });
 });
