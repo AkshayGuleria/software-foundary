@@ -72,4 +72,18 @@ describe("ProjectsPage", () => {
     expect(screen.getByText("active")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /pause/i })).toBeInTheDocument();
   });
+
+  it("links each project name to its detail page", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({
+        data: [{ id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-01-01T00:00:00Z" }],
+        paging: {},
+      }),
+    });
+
+    renderWithClient(<ProjectsPage />);
+
+    await waitFor(() => expect(screen.getByRole("link", { name: "acme" })).toHaveAttribute("href", "/projects/p1"));
+  });
 });

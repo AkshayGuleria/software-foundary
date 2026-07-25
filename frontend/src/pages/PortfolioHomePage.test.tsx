@@ -100,4 +100,21 @@ describe("PortfolioHomePage", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/projects/p1/pause", expect.objectContaining({ method: "POST" })),
     );
   });
+
+  it("links each project card to its detail page", async () => {
+    const rows = [
+      {
+        project_id: "p1", name: "quiet", status: "active", active_run_count: 0, pending_gate_count: 0,
+        last_run_status: null, last_run_at: null, rework_rate: null, budget_burn_ratio: null, attention_score: 0.0,
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: rows, paging: {} }) }),
+    );
+
+    renderWithClient(<PortfolioHomePage />);
+
+    await waitFor(() => expect(screen.getByRole("link", { name: "quiet" })).toHaveAttribute("href", "/projects/p1"));
+  });
 });

@@ -25,7 +25,7 @@ export default function ProjectsPage() {
             <li key={p.id} className="flex flex-col gap-2 rounded border border-slate-800 px-3 py-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <Link to={`/runs?project_id=${p.id}`} className="font-medium text-orange-400 hover:underline">
+                  <Link to={`/projects/${p.id}`} className="font-medium text-orange-400 hover:underline">
                     {p.name}
                   </Link>
                   <span className="ml-2 text-sm text-slate-500">{p.path}</span>
