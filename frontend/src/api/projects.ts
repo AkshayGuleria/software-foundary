@@ -29,3 +29,8 @@ export async function activateProject(id: string): Promise<Project> {
   const res = await apiFetch<Project>(`/api/projects/${id}/activate`, { method: "POST" });
   return res.data;
 }
+
+export async function getProject(id: string): Promise<Project> {
+  const res = await apiFetch<Project>(`/api/projects/${id}`);
+  return res.data;
+}

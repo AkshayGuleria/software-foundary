@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { activateProject, archiveProject, createProject, listProjects, pauseProject } from "./projects";
+import { activateProject, archiveProject, createProject, getProject, listProjects, pauseProject } from "./projects";
 
 describe("projects API", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
@@ -82,5 +82,25 @@ describe("projects API", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/projects/p1/activate", expect.objectContaining({ method: "POST" }));
     expect(result.status).toBe("active");
+  });
+});
+
+describe("getProject", () => {
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetches a single project by id", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({
+        data: { id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-07-21T00:00:00Z" },
+        paging: {},
+      }),
+    });
+
+    const project = await getProject("p1");
+
+    expect(project.name).toBe("acme");
+    expect(fetch).toHaveBeenCalledWith("/api/projects/p1", undefined);
   });
 });

@@ -15,7 +15,7 @@ function ProjectCard({ project }: { project: ProjectHealth }) {
       className="flex flex-col gap-2 rounded border border-slate-800 px-3 py-2"
     >
       <div className="flex items-center justify-between">
-        <Link to={`/runs?project_id=${project.project_id}`} className="font-medium text-orange-400 hover:underline">
+        <Link to={`/projects/${project.project_id}`} className="font-medium text-orange-400 hover:underline">
           {project.name}
         </Link>
         <span className="text-xs uppercase text-slate-500">{project.status}</span>

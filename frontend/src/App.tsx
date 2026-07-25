@@ -4,6 +4,7 @@ import KnowledgePage from "./pages/KnowledgePage";
 import MetricsPage from "./pages/MetricsPage";
 import PacksPage from "./pages/PacksPage";
 import PortfolioHomePage from "./pages/PortfolioHomePage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import RunDetailPage from "./pages/RunDetailPage";
 import RunsHomePage from "./pages/RunsHomePage";
@@ -41,6 +42,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<PortfolioHomePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/runs" element={<RunsHomePage />} />
           <Route path="/runs/:id" element={<RunDetailPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />
