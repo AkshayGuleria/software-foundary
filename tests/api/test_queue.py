@@ -104,3 +104,90 @@ async def test_queue_lists_open_human_tasks_not_closed_ones(api_client):
     assert human_tasks[0]["reason"] == "Budget exceeded"
     assert human_tasks[0]["project_id"] == project.id
     assert human_tasks[0]["run_id"] == run.id
+
+
+@pytest.mark.asyncio
+async def test_batch_decide_approves_multiple_gates_and_skips_already_decided(api_client):
+    client, store, _scheduler = api_client
+
+    project = await store.create_project("batch1", ".")
+    run = await store.create_run(project.id, "p.toml", "batch1-run")
+    unit1, unit2, unit3 = await store.create_work_units(
+        [
+            WorkUnit(run_id=run.id, step_id="s1", type="task", status="open"),
+            WorkUnit(run_id=run.id, step_id="s2", type="task", status="open"),
+            WorkUnit(run_id=run.id, step_id="s3", type="task", status="open"),
+        ]
+    )
+    gate1 = await store.create_gate(work_unit_id=unit1.id, gate_type="human", decision="pending")
+    gate2 = await store.create_gate(work_unit_id=unit2.id, gate_type="human", decision="pending")
+    already_decided = await store.create_gate(work_unit_id=unit3.id, gate_type="human", decision="approved")
+
+    resp = await client.post(
+        "/api/gates/batch-decide", json={"gate_ids": [gate1.id, gate2.id, already_decided.id]}
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert sorted(body["approved"]) == sorted([gate1.id, gate2.id])
+    assert body["skipped"] == [already_decided.id]
+
+    queue_resp = await client.get("/api/queue")
+    assert queue_resp.json()["data"]["gates"] == []
+
+
+@pytest.mark.asyncio
+async def test_batch_decide_with_unknown_gate_id_skips_it(api_client):
+    client, _store, _scheduler = api_client
+
+    resp = await client.post("/api/gates/batch-decide", json={"gate_ids": ["does-not-exist"]})
+
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["approved"] == []
+    assert body["skipped"] == ["does-not-exist"]
+
+
+@pytest.mark.asyncio
+async def test_complete_human_task_resolves_it(api_client):
+    client, store, _scheduler = api_client
+
+    project = await store.create_project("ht1", ".")
+    run = await store.create_run(project.id, "p.toml", "ht1-run")
+    unit = (
+        await store.create_work_units(
+            [WorkUnit(run_id=run.id, step_id="_budget", type="human_task", status="open")]
+        )
+    )[0]
+
+    resp = await client.post(f"/api/human-tasks/{unit.id}/complete")
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "closed"
+
+    queue_resp = await client.get("/api/queue")
+    assert queue_resp.json()["data"]["human_tasks"] == []
+
+
+@pytest.mark.asyncio
+async def test_complete_human_task_404s_for_missing_unit(api_client):
+    client, _store, _scheduler = api_client
+
+    resp = await client.post("/api/human-tasks/does-not-exist/complete")
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_complete_human_task_409s_for_non_human_task_unit(api_client):
+    client, store, _scheduler = api_client
+
+    project = await store.create_project("ht2", ".")
+    run = await store.create_run(project.id, "p.toml", "ht2-run")
+    unit = (
+        await store.create_work_units([WorkUnit(run_id=run.id, step_id="s1", type="task", status="open")])
+    )[0]
+
+    resp = await client.post(f"/api/human-tasks/{unit.id}/complete")
+
+    assert resp.status_code == 409

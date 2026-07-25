@@ -3,8 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from foundry.api.errors import ConflictError, NotFoundError
 from foundry.api.routes.projects import _get_store
 from foundry.api.schemas import ApiResponse, Paging
+from foundry.store.models import Gate
 
 router = APIRouter()
 
@@ -108,4 +110,62 @@ async def get_queue(request: Request) -> ApiResponse[QueueOut]:
 
     return ApiResponse[QueueOut](
         data=QueueOut(gates=gate_items, human_tasks=human_task_items), paging=Paging.none()
+    )
+
+
+class BatchDecideIn(BaseModel):
+    gate_ids: list[str]
+
+
+class BatchDecideOut(BaseModel):
+    approved: list[str]
+    skipped: list[str]
+
+
+@router.post("/gates/batch-decide")
+async def batch_decide_gates(body: BatchDecideIn, request: Request) -> ApiResponse[BatchDecideOut]:
+    store = _get_store(request)
+
+    approved: list[str] = []
+    skipped: list[str] = []
+
+    for gate_id in body.gate_ids:
+        # _fetch_gate is defined and immediately awaited within this same
+        # iteration (not deferred), so it always sees the current gate_id --
+        # no late-binding closure risk despite being redefined every loop pass.
+        # Matches the existing single-fetch idiom in routes/gates.py's decide_gate.
+        async def _fetch_gate(session, gate_id: str = gate_id):
+            return await session.get(Gate, gate_id)
+
+        gate = await store.read(_fetch_gate)
+        if gate is None or gate.decision != "pending":
+            skipped.append(gate_id)
+            continue
+        await store.decide_gate(gate_id, "approved", decided_by="api")
+        approved.append(gate_id)
+
+    return ApiResponse[BatchDecideOut](
+        data=BatchDecideOut(approved=approved, skipped=skipped), paging=Paging.none()
+    )
+
+
+class HumanTaskCompleteOut(BaseModel):
+    id: str
+    status: str
+
+
+@router.post("/human-tasks/{unit_id}/complete")
+async def complete_human_task(unit_id: str, request: Request) -> ApiResponse[HumanTaskCompleteOut]:
+    store = _get_store(request)
+
+    unit = await store.get_unit(unit_id)
+    if unit is None:
+        raise NotFoundError(f"Work unit {unit_id} not found")
+    if unit.type != "human_task" or unit.status != "open":
+        raise ConflictError(f"Work unit {unit_id} is not an open human_task")
+
+    await store.complete_human_task(unit_id)
+
+    return ApiResponse[HumanTaskCompleteOut](
+        data=HumanTaskCompleteOut(id=unit_id, status="closed"), paging=Paging.none()
     )
