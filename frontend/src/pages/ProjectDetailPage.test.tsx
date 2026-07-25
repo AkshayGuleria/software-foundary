@@ -57,4 +57,46 @@ describe("ProjectDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText(/project not found/i)).toBeInTheDocument());
   });
+
+  it("renders recent runs and metrics for the project", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/projects/p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: { id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-07-21T00:00:00Z" },
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/runs?project_id=p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: [{ id: "r1", project_id: "p1", playbook_ref: "demo.toml", title: "demo run", status: "active", created_at: "2026-07-21T00:00:00Z" }],
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/metrics/p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: { approval_latency_seconds: 30, rework_rate: 0.2, retry_count: 1, crash_count: 0, auto_resolved_count: 2, escalated_count: 0 },
+              paging: {},
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }),
+    );
+
+    renderWithProviders("p1");
+
+    await waitFor(() => expect(screen.getByRole("link", { name: /demo run/i })).toHaveAttribute("href", "/runs/r1"));
+    expect(screen.getByRole("link", { name: /view all runs/i })).toHaveAttribute("href", "/runs?project_id=p1");
+    expect(screen.getByText("20%")).toBeInTheDocument();
+  });
 });
