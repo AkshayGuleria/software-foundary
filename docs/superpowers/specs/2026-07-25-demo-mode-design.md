@@ -3,7 +3,11 @@
 **Refined 2026-07-26:** this spec was originally written right after the
 metrics-view round shipped, before Project view (G3), per-project settings
 (G4), and My-queue (G2) existed. Refinement added two scope items those
-features need (below), and resolved both open design questions.
+features need (below), resolved both open design questions, and — a second
+refinement pass the same day — added a UI-driven demo-mode toggle (see
+"UI demo-mode toggle" section below), extending scope from "CLI seeds a
+file you point `foundry serve --db` at" to "the running server can hot-swap
+its own database at runtime."
 
 ## Goal
 
@@ -64,6 +68,12 @@ slice of a working deployment, all at once, that stays up and browsable.
   run) so `ProjectDetailPage`'s Settings form and `NewRunForm`'s pre-fill
   behavior have something real to show instead of every project sitting on
   the same defaults.
+- **A UI toggle to switch the running server into and out of demo mode**
+  (see "UI demo-mode toggle" section below) — auto-seeding the demo db on
+  first activation if it hasn't been seeded yet, plus a "Reseed" action
+  while active. This is the second refinement's addition: demo mode is no
+  longer just a CLI command you point a separate `foundry serve` at, it's a
+  runtime-switchable mode on the server you're already running.
 
 **Out of scope:**
 - Not a replacement for pytest fixtures — existing `tests/fixtures/` and
@@ -109,6 +119,70 @@ DB rows reference it, and avoids unrelated fake Python files in
 `software-foundary`'s own source tree that a future contributor might
 mistake for real code.
 
+## UI demo-mode toggle (added in second refinement, 2026-07-26)
+
+A true toggle: switching into demo mode and back to the server's original
+database both happen at runtime, without restarting the `foundry serve`
+process. Resolved during brainstorming: hot-swap the running server's DB
+connection (not a link to a separately-started demo server) — the
+architecture supports this cleanly (see below), and a one-way-only switch
+was rejected as an odd fit for a UI toggle affordance.
+
+**Backend — new `src/foundry/api/routes/demo.py`:**
+- `GET /api/demo/status` → `{active: bool, db_path: str}`, so the frontend
+  can render the correct toggle state on page load/refresh without
+  guessing from client-side state alone.
+- `POST /api/demo/activate` → hot-swap to the demo db, seeding it first if
+  it hasn't been seeded yet (detect via a marker row/table, not just file
+  existence — see "What I did not design here" below). Returns updated status.
+- `POST /api/demo/deactivate` → hot-swap back to the original db the
+  server was started with.
+- `POST /api/demo/reseed` → 409s if demo mode isn't currently active
+  (reseeding only makes sense for the db you're currently on); otherwise
+  wipes and reseeds the demo db in place.
+
+**Swap mechanics**, shared by all three mutating endpoints via one helper:
+1. Stop the current `Scheduler` (`await scheduler.stop()` — already cancels
+   its tick loop cleanly, existing method, no changes needed to it).
+2. Stop the current `Store` (`await store.stop()` — already drains its
+   single-writer queue and joins the writer task cleanly, existing method).
+3. Dispose the old engine.
+4. Build a fresh engine/sessionmaker for the target db path
+   (`make_engine`/`make_sessionmaker`/`init_db`, all existing), seed it if
+   this is an activation-of-an-unseeded-demo-db case.
+5. Construct and start a new `Store` and `Scheduler` for the target db,
+   including the equivalent of `_recover_active_runs` so any in-flight runs
+   on that db get re-registered.
+6. Only after the new `Store`/`Scheduler` are fully started, reassign
+   `app.state.store`/`app.state.scheduler` in place — `_get_store(request)`
+   already reads `request.app.state.store` fresh per-request
+   (`src/foundry/api/routes/projects.py`), so no FastAPI app restart is
+   needed; existing route handlers pick up the new store on their next call
+   automatically.
+7. The whole swap is wrapped in a lock (e.g. an `asyncio.Lock` on
+   `app.state`) so two swap requests can't race each other.
+
+**Server needs to remember its original db path** — stashed as
+`app.state.original_db_path` at `foundry serve` startup — for the
+deactivate direction to know what to swap back to.
+
+**Reusable seeding function, not CLI-only.** Because both `foundry
+demo-seed` (CLI) and `POST /api/demo/activate`/`reseed` (API) need to run
+the exact same seeding logic, the seeding code must be built as an
+importable function from the start (e.g. `foundry.demo.seed.run_demo_seed(store, ...)`
+returning once seeding is complete), not written as a CLI-command-only
+script that would need duplicating or awkwardly invoking as a subprocess
+from the API layer.
+
+**Frontend:** a "Demo mode" toggle in the nav header (calls
+`GET /api/demo/status` on mount, `POST /api/demo/activate`/`deactivate` on
+toggle); a "Reseed" button rendered only while active. Because the entire
+database underneath the app just changed, any of these three calls clears
+the whole TanStack Query cache (not a targeted `invalidateQueries` on one
+key — everything is potentially stale) and navigates back to `/`, since a
+deep-linked run/project id from before the swap won't exist against the
+new db.
+
 ## Non-functional constraints carried over from the rest of the codebase
 
 - Must not touch a real/default `foundry.db` by accident — `demo-seed`
@@ -123,4 +197,12 @@ mistake for real code.
 Exact seed data (which project names, how many of each state, exact fake
 lesson/pitfall text) and the toy repo's generated file/import structure are
 implementation-plan-level detail, not spec-level — the plan should pick
-concrete numbers consistent with the design decisions above.
+concrete numbers consistent with the design decisions above. Also
+implementation-plan-level, from the UI toggle addition:
+- The exact "has this db been seeded" detection mechanism (a marker
+  row/table vs. checking whether any projects exist at all).
+- What happens to a request that was already in-flight against the old
+  store at the exact moment of a swap (accepted as a best-effort brief
+  window, not worth distributed-locking machinery for what is fundamentally
+  a demo/kiosk feature, not a production concern).
+- Exact toggle/button placement and styling in the nav header.
