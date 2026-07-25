@@ -99,4 +99,42 @@ describe("ProjectDetailPage", () => {
     expect(screen.getByRole("link", { name: /view all runs/i })).toHaveAttribute("href", "/runs?project_id=p1");
     expect(screen.getByText("20%")).toBeInTheDocument();
   });
+
+  it("orders runs by created_at descending regardless of API response order", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/projects/p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: { id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-07-21T00:00:00Z" },
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/runs?project_id=p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              // Deliberately returned oldest-first to prove the page sorts rather than trusting API order.
+              data: [
+                { id: "r-old", project_id: "p1", playbook_ref: "demo.toml", title: "old run", status: "active", created_at: "2026-07-01T00:00:00Z" },
+                { id: "r-new", project_id: "p1", playbook_ref: "demo.toml", title: "new run", status: "active", created_at: "2026-07-20T00:00:00Z" },
+              ],
+              paging: {},
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }),
+    );
+
+    renderWithProviders("p1");
+
+    await waitFor(() => expect(screen.getByRole("link", { name: /new run/i })).toBeInTheDocument());
+
+    const links = screen.getAllByRole("link").filter((el) => el.getAttribute("href")?.startsWith("/runs/"));
+    expect(links.map((el) => el.getAttribute("href"))).toEqual(["/runs/r-new", "/runs/r-old"]);
+  });
 });

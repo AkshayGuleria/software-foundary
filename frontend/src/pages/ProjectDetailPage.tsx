@@ -56,7 +56,7 @@ export default function ProjectDetailPage() {
           </Link>
         </div>
         <ul className="flex flex-col gap-2">
-          {(runs ?? []).slice(0, 5).map((r) => (
+          {[...(runs ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5).map((r) => (
             <li key={r.id} className="flex items-center justify-between rounded border border-slate-800 px-3 py-2">
               <Link to={`/runs/${r.id}`} className="font-medium text-orange-400 hover:underline">
                 {r.title}
