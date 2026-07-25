@@ -32,6 +32,9 @@ export interface Project {
   kg_status: string;
   status: string;
   created_at: string;
+  default_driver: string;
+  default_token_budget: number;
+  default_playbook_path: string | null;
 }
 
 export interface Run {

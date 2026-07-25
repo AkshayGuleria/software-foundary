@@ -34,3 +34,15 @@ export async function getProject(id: string): Promise<Project> {
   const res = await apiFetch<Project>(`/api/projects/${id}`);
   return res.data;
 }
+
+export async function updateProjectSettings(
+  id: string,
+  fields: { driver?: string; token_budget?: number; playbook_path?: string },
+): Promise<Project> {
+  const res = await apiFetch<Project>(`/api/projects/${id}/settings`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  return res.data;
+}

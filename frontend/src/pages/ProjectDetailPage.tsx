@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { getProject } from "../api/projects";
+import { getProject, updateProjectSettings } from "../api/projects";
 import { getProjectMetrics } from "../api/metrics";
 import { getProjectKgGraph, listMemory } from "../api/knowledge";
 import { listRuns } from "../api/runs";
@@ -38,6 +39,29 @@ export default function ProjectDetailPage() {
     enabled: !!project,
   });
 
+  const queryClient = useQueryClient();
+  const [driver, setDriver] = useState("fake");
+  const [tokenBudget, setTokenBudget] = useState(0);
+  const [playbookPath, setPlaybookPath] = useState("");
+
+  const settingsMutation = useMutation({
+    mutationFn: () =>
+      updateProjectSettings(projectId, {
+        driver,
+        token_budget: tokenBudget,
+        playbook_path: playbookPath,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+  });
+
+  useEffect(() => {
+    if (project) {
+      setDriver(project.default_driver);
+      setTokenBudget(project.default_token_budget ?? 0);
+      setPlaybookPath(project.default_playbook_path ?? "");
+    }
+  }, [project]);
+
   if (isError) {
     return <p className="text-slate-400">Project not found.</p>;
   }
@@ -59,6 +83,55 @@ export default function ProjectDetailPage() {
           status={project.status}
           invalidateQueryKey={["project", projectId]}
         />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Settings</h3>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            settingsMutation.mutate();
+          }}
+        >
+          <label className="flex flex-col text-sm">
+            Driver
+            <select
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
+              value={driver}
+              onChange={(e) => setDriver(e.target.value)}
+            >
+              <option value="fake">fake</option>
+              <option value="codex">codex</option>
+              <option value="claude">claude</option>
+            </select>
+          </label>
+          <label className="flex flex-col text-sm">
+            Token budget
+            <input
+              type="number"
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
+              value={tokenBudget}
+              onChange={(e) => setTokenBudget(Number(e.target.value))}
+            />
+          </label>
+          <label className="flex flex-col text-sm">
+            Default playbook path
+            <input
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
+              value={playbookPath}
+              onChange={(e) => setPlaybookPath(e.target.value)}
+              placeholder="packs/default/playbooks/sdlc_story.toml"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={settingsMutation.isPending}
+            className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium hover:bg-orange-500"
+          >
+            Save settings
+          </button>
+        </form>
       </div>
 
       <div className="flex flex-col gap-3">
