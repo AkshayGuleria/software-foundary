@@ -106,3 +106,21 @@ def test_run_wires_the_default_pack_when_playbook_lives_inside_one(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
+
+
+def test_demo_seed_command_populates_a_fresh_db(tmp_path):
+    db_path = str(tmp_path / "demo.db")
+    repos_dir = str(tmp_path / "demo-repos")
+
+    result = runner.invoke(app, ["demo-seed", "--db", db_path, "--repos-dir", repos_dir])
+
+    assert result.exit_code == 0, result.output
+    assert "seeded" in result.output.lower()
+
+
+def test_demo_seed_refuses_to_run_without_an_explicit_db_path():
+    result = runner.invoke(app, ["demo-seed"])
+
+    # Typer's own missing-required-option handling is enough here -- no
+    # default that could silently point at a real foundry.db.
+    assert result.exit_code != 0

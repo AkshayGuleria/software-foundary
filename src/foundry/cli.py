@@ -8,6 +8,7 @@ import uvicorn
 
 from foundry.api.app import create_app
 from foundry.api.scheduler import Scheduler
+from foundry.demo.seed import run_demo_seed
 from foundry.drivers.factory import make_driver
 from foundry.kg.service import build_kg
 from foundry.orchestrator.tick import Orchestrator
@@ -153,6 +154,26 @@ async def _archive_events(db: str, archive_dir: str, older_than_days: int) -> No
 @app.command()
 def serve(db: str = "foundry.db", host: str = "127.0.0.1", port: int = 8000) -> None:
     asyncio.run(_serve(db, host, port))
+
+
+@app.command("demo-seed")
+def demo_seed(
+    db: str = typer.Option(..., "--db", help="Path to the demo SQLite db (required, no default)"),
+    repos_dir: str = ".foundry-demo",
+) -> None:
+    asyncio.run(_demo_seed(db, repos_dir))
+    typer.echo(f"seeded {db}")
+
+
+async def _demo_seed(db: str, repos_dir: str) -> None:
+    engine = make_engine(db)
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+
+    await run_demo_seed(store, repos_dir)
+
+    await store.stop()
 
 
 async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
