@@ -70,3 +70,41 @@ async def test_seed_creates_a_rejection_rework_run_and_a_cancelled_run(tmp_path)
     assert cancelled_runs, "expected at least one cancelled run"
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_seed_creates_an_open_human_task_and_memory_items(tmp_path):
+    store = await _make_store(tmp_path)
+
+    await run_demo_seed(store, str(tmp_path / "demo-repos"))
+
+    open_human_tasks = []
+    for run in await store.list_runs():
+        units = await store.list_units(run.id)
+        open_human_tasks.extend(u for u in units if u.type == "human_task" and u.status == "open")
+    assert open_human_tasks, "expected at least one open human_task unit (budget-exceeded escalation)"
+
+    memory_items = await store.list_memory_items()
+    assert len(memory_items) >= 3
+    assert {m.kind for m in memory_items} >= {"lesson", "pattern", "pitfall"}
+
+    await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_seed_varies_project_settings_and_lifecycle_states(tmp_path):
+    store = await _make_store(tmp_path)
+
+    await run_demo_seed(store, str(tmp_path / "demo-repos"))
+
+    projects = await store.list_projects()
+    assert len(projects) >= 5
+
+    drivers = {p.default_driver for p in projects}
+    assert len(drivers) > 1, "expected varied default_driver across demo projects, not all identical"
+
+    statuses = {p.status for p in projects}
+    assert "paused" in statuses
+    assert "archived" in statuses
+
+    await store.stop()

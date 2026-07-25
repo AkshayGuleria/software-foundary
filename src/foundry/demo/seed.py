@@ -279,6 +279,80 @@ async def _seed_cancelled_run(store: Store, project, project_dir: str) -> None:
     await store.update_run(run.id, status="cancelled")
 
 
+async def _seed_budget_exceeded_run(store: Store, project, project_dir: str) -> None:
+    """A run whose token_budget is exhausted, producing an open human_task
+    unit via the real dispatch() budget-exceeded path (tick.py) rather
+    than a direct write -- this state IS reachable by construction, it
+    just needs tokens_used pushed past token_budget before ticking.
+
+    Confirmed by reading tick.py's dispatch(): it computes ready_tasks
+    and slots, then checks `check_budget(run) == "exceeded"` BEFORE the
+    dispatch loop that would hand work to any ready task -- so setting
+    tokens_used > token_budget prior to the first tick guarantees no task
+    ever dispatches; dispatch() instead appends a `budget.exceeded` event
+    (once, guarded by an already-flagged scan of prior events) and creates
+    exactly one `WorkUnit(step_id="_budget", type="human_task",
+    status="open")`, then returns 0.
+
+    Deviation from every other seed run in this file: this one calls
+    `orchestrator.tick()` directly, ONCE, instead of going through
+    `_run_to_pending_or_completion`. Verified empirically (a standalone
+    script inspecting the resulting units) that ticking more than once
+    changes the unit's status out from under the "open" claim: `tick()`'s
+    own `unblock()` step runs `Store.get_ready_units()` first, which
+    matches ANY unit with status "open" and all deps closed -- and the
+    `_budget` human_task has no deps at all (it's created directly by
+    dispatch(), never wired into UnitDep), so on the *second* tick,
+    `unblock()` flips it from "open" straight to "ready" before dispatch()
+    even runs again. `_run_to_pending_or_completion` always ticks at least
+    twice (its stall check needs two equal-progress readings before it can
+    break), so using it here would silently turn this into a "ready"
+    human_task, not the "open" one the seed data (and its test) actually
+    wants. A single `tick()` call is also all this state needs: the
+    budget check runs before the dispatch loop that would hand out any
+    ready task, so tokens_used > token_budget guarantees zero dispatch on
+    the very first tick, same as on every later one.
+    """
+    playbook = load_playbook(BUGFIX_PLAYBOOK)
+    run = await store.create_run(project.id, BUGFIX_PLAYBOOK, "Refactor report caching layer")
+    await store.update_run(run.id, token_budget=1000, tokens_used=1500)
+    await materialize(playbook, run.id, store)
+
+    driver = FakeDriver(_HAPPY_PATH_SCRIPT)
+    orchestrator = Orchestrator(store, driver, playbook, project_path=project_dir)
+    await orchestrator.tick(run.id)
+
+
+async def _seed_memory_items(store: Store, project) -> None:
+    await store.create_memory_item(
+        scope="project",
+        kind="lesson",
+        title="Paginate before you filter",
+        body_md="Filtering the full result set before pagination caused a "
+        "timeout on large reports. Apply filters in the SQL query, not "
+        "after fetching.",
+        project_id=project.id,
+    )
+    await store.create_memory_item(
+        scope="project",
+        kind="pattern",
+        title="CSV export reuses the report's existing serializer",
+        body_md="Don't write a second serialization path for exports -- "
+        "the report view's own row formatter already handles every edge "
+        "case (null fields, currency formatting).",
+        project_id=project.id,
+    )
+    await store.create_memory_item(
+        scope="project",
+        kind="pitfall",
+        title="Off-by-one in manual pagination math",
+        body_md="`page - 1` vs `page` as the offset multiplier bit us "
+        "twice in this project. Prefer the shared paginate() helper over "
+        "hand-rolled offset math.",
+        project_id=project.id,
+    )
+
+
 class _ReviewGateHoldOrchestrator(Orchestrator):
     """Orchestrator whose tick() never auto-resolves agent-type review gates.
 
@@ -317,3 +391,47 @@ async def run_demo_seed(store: Store, base_dir: str) -> None:
     gamma = await store.create_project("gamma-api", gamma_dir)
     await _seed_rejection_rework_run(store, gamma, gamma_dir)
     await _seed_cancelled_run(store, gamma, gamma_dir)
+
+    delta_dir = os.path.join(base_dir, "delta-billing")
+    generate_toy_repo(delta_dir, num_files=8)
+    delta = await store.create_project("delta-billing", delta_dir)
+    await _seed_budget_exceeded_run(store, delta, delta_dir)
+
+    epsilon_dir = os.path.join(base_dir, "epsilon-notifications")
+    generate_toy_repo(epsilon_dir, num_files=9)
+    epsilon = await store.create_project("epsilon-notifications", epsilon_dir)
+    await _seed_closed_successful_run(store, epsilon, epsilon_dir)
+
+    for proj in (acme, beta, gamma, delta, epsilon):
+        await _seed_memory_items(store, proj)
+
+    # Varied per-project settings so the Settings form / NewRunForm
+    # pre-fill have something real to show instead of every project
+    # sitting on the same defaults.
+    await store.update_project(
+        acme.id, default_driver="fake", default_token_budget=50000, default_playbook_path=BUGFIX_PLAYBOOK
+    )
+    await store.update_project(
+        beta.id, default_driver="codex", default_token_budget=100000, default_playbook_path=SDLC_PLAYBOOK
+    )
+    await store.update_project(
+        gamma.id, default_driver="claude", default_token_budget=75000, default_playbook_path=SDLC_PLAYBOOK
+    )
+    await store.update_project(
+        delta.id, default_driver="fake", default_token_budget=1000, default_playbook_path=BUGFIX_PLAYBOOK
+    )
+    await store.update_project(
+        epsilon.id, default_driver="codex", default_token_budget=30000, default_playbook_path=BUGFIX_PLAYBOOK
+    )
+
+    # Project lifecycle variety -- pause one, archive another, matching
+    # every Project.status value the dashboard renders differently.
+    await store.update_project(delta.id, status="paused")
+    await store.update_project(epsilon.id, status="archived")
+
+    # acme and epsilon only got one run each above -- give both a second
+    # run so every project has 2+ runs (spec: "2-4 runs spanning every
+    # state"), reusing Task 3/4's helpers as-is since neither hardcodes
+    # which project it's called with.
+    await _seed_active_pending_human_gate_run(store, acme, acme_dir)
+    await _seed_cancelled_run(store, epsilon, epsilon_dir)
