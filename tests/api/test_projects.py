@@ -122,3 +122,47 @@ async def test_creating_a_run_for_a_paused_project_409s(api_client):
         "/api/runs", json={"project_id": project_id, "playbook_path": "packs/default/playbooks/bugfix.toml"}
     )
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_new_project_has_default_settings(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo5", "path": "."})
+
+    body = resp.json()["data"]
+    assert body["default_driver"] == "fake"
+    assert body["default_token_budget"] == 0
+    assert body["default_playbook_path"] is None
+
+
+@pytest.mark.asyncio
+async def test_patch_settings_updates_only_provided_fields(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.post("/api/projects", json={"name": "demo6", "path": "."})
+    project_id = resp.json()["data"]["id"]
+
+    resp = await client.patch(f"/api/projects/{project_id}/settings", json={"driver": "codex"})
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["default_driver"] == "codex"
+    assert body["default_token_budget"] == 0  # untouched
+    assert body["default_playbook_path"] is None  # untouched
+
+    resp = await client.patch(
+        f"/api/projects/{project_id}/settings",
+        json={"token_budget": 50000, "playbook_path": "packs/default/playbooks/bugfix.toml"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["default_driver"] == "codex"  # still untouched by this second call
+    assert body["default_token_budget"] == 50000
+    assert body["default_playbook_path"] == "packs/default/playbooks/bugfix.toml"
+
+
+@pytest.mark.asyncio
+async def test_patch_settings_for_missing_project_404s(api_client):
+    client, _store, _scheduler = api_client
+
+    resp = await client.patch("/api/projects/does-not-exist/settings", json={"driver": "codex"})
+
+    assert resp.status_code == 404

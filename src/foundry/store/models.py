@@ -41,6 +41,9 @@ class Project(Base):
     path: Mapped[str] = mapped_column(String)
     kg_status: Mapped[str] = mapped_column(String, default="none")
     status: Mapped[str] = mapped_column(String, default="active")
+    default_driver: Mapped[str] = mapped_column(String, default="fake")
+    default_token_budget: Mapped[int] = mapped_column(Integer, default=0)
+    default_playbook_path: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

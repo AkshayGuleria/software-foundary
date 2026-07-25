@@ -20,6 +20,12 @@ class ProjectCreate(BaseModel):
     path: str
 
 
+class ProjectSettingsUpdate(BaseModel):
+    driver: str | None = None
+    token_budget: int | None = None
+    playbook_path: str | None = None
+
+
 class ProjectOut(BaseModel):
     id: str
     name: str
@@ -27,6 +33,9 @@ class ProjectOut(BaseModel):
     kg_status: str
     status: str
     created_at: str
+    default_driver: str
+    default_token_budget: int
+    default_playbook_path: str | None
 
 
 def _to_project_out(p: Project) -> ProjectOut:
@@ -37,6 +46,9 @@ def _to_project_out(p: Project) -> ProjectOut:
         kg_status=p.kg_status,
         status=p.status,
         created_at=p.created_at.isoformat(),
+        default_driver=p.default_driver,
+        default_token_budget=p.default_token_budget,
+        default_playbook_path=p.default_playbook_path,
     )
 
 
@@ -95,3 +107,27 @@ async def archive_project(project_id: str, request: Request) -> ApiResponse[Proj
 @router.post("/projects/{project_id}/activate")
 async def activate_project(project_id: str, request: Request) -> ApiResponse[ProjectOut]:
     return await _transition_project(request, project_id, "active")
+
+
+@router.patch("/projects/{project_id}/settings")
+async def update_project_settings(
+    project_id: str, body: ProjectSettingsUpdate, request: Request
+) -> ApiResponse[ProjectOut]:
+    store = _get_store(request)
+    project = await store.get_project(project_id)
+    if project is None:
+        raise NotFoundError(f"Project {project_id} not found")
+
+    fields: dict[str, object] = {}
+    if body.driver is not None:
+        fields["default_driver"] = body.driver
+    if body.token_budget is not None:
+        fields["default_token_budget"] = body.token_budget
+    if body.playbook_path is not None:
+        fields["default_playbook_path"] = body.playbook_path
+
+    if fields:
+        await store.update_project(project_id, **fields)
+        project = await store.get_project(project_id)
+
+    return ApiResponse[ProjectOut](data=_to_project_out(project), paging=Paging.none())
