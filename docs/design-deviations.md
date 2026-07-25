@@ -9,6 +9,15 @@ shipped. Items below are marked `[FIXED]` where closed, left as-is otherwise. A 
 section G adds frontend-side findings from a follow-up review (backend-only in the
 original pass).
 
+**Update (2026-07-25, `master @ adf2833`):** four more rounds closed A5, G2
+(My-queue + batch-approve, plus wiring the previously-dormant
+`Store.complete_human_task()`), G3 (Project view), G4 (settings — scoped
+per-project rather than per-pack, see G4's note), and G5 (Metrics view). Each
+had its own spec → plan → subagent-driven build → whole-branch review cycle;
+see `docs/superpowers/specs/2026-07-25-*-design.md` and
+`docs/superpowers/plans/2026-07-25-*.md` for the four rounds
+(`project-view`, `project-settings`, `my-queue`, `metrics-view`).
+
 ## A. Never built
 
 - **A1. `/internal` HTTP API.** Design doc §7 specifies a full internal API
@@ -24,13 +33,15 @@ original pass).
   expected per roadmap but not yet due.
 - **A4. Chat-to-role / `notes_addressed` mapping** (design doc §11 dashboard chat
   contract). Explicitly deferred since M1a; still absent.
-- **A5. My-queue view + batch-approve.** Design doc §11 describes a cross-project
-  "My queue" with batch gate approval. No such view or endpoint exists; gates are
-  approved per-run only. Frontend confirmed absent too — see G2.
-- **A6. Packs & settings page / Project view** as separately specified in §11. What
-  shipped in M4b (`PortfolioHomePage`, `PacksPage`) covers similar ground but isn't
-  the same page structure the design doc lays out. Frontend confirmed absent too —
-  see G3 (Project view), G4 (Packs & settings).
+- **A5. My-queue view + batch-approve.** `[FIXED]` `GET /api/queue` (cross-project
+  pending human/derived gates + open `human_task` units, sorted oldest-first),
+  `POST /api/gates/batch-decide` (approve-only batch), and
+  `POST /api/human-tasks/{id}/complete` (wires the previously-dormant
+  `Store.complete_human_task()` — it had zero API callers before this) all
+  shipped alongside `QueuePage` at `/queue`. See G2.
+- **A6. Packs & settings page / Project view** as separately specified in §11.
+  `[FIXED]` See G3 (Project view) and G4 (settings) — both closed, though
+  settings landed scoped per-project rather than per-pack (see G4's note).
 
 ## B. Built differently than specified
 
@@ -105,32 +116,47 @@ is end-to-end, not backend-only, plus one new structural finding:
 - **G1. "Feed & chat" panel is feed-only.** `EventFeed.tsx` has zero POST/textarea/
   mutation — pure read-only event stream. Design's human↔role chat notes (§11)
   never built on the frontend either. Frontend face of A4.
-- **G2. "My queue" doesn't exist.** No route, no component — `grep` for
-  queue/batch-approve across `frontend/src` is empty. Frontend face of A5.
-- **G3. "Project view" never built.** Design specifies a per-project drill-down
-  (runs, KG status, memory items, metrics trends, settings). No `/projects/:id`
-  route exists in `App.tsx`; `ProjectsPage` is a flat list, and clicking a project
-  links to `/runs?project_id=X` (filtered runs list) rather than a dedicated page.
-- **G4. "Packs & settings" is view-only.** `PacksPage.tsx` has zero POST/PUT/
-  mutation — pure pack/role/playbook browser. Design's gate-policy defaults /
-  driver config / budget settings surface never built. G3+G4 are the frontend face
-  of A6.
-- **G5. No dedicated Metrics view (new finding, not in original audit).** Design
-  §11.1 implies a standalone metrics screen ("the dashboard gets a metrics view
-  over them"). `MetricsSummary` exists but is mounted inline on `RunsHomePage`
-  only — no dedicated route.
+- **G2. "My queue" doesn't exist.** `[FIXED]` `QueuePage` at `/queue` — pending
+  gates (checkbox + batch-approve) and open human tasks (per-item "Mark
+  resolved"), both linking back to their run. Frontend face of A5.
+- **G3. "Project view" never built.** `[FIXED]` `ProjectDetailPage` at
+  `/projects/:id` — header + lifecycle actions, recent runs, metrics, KG graph,
+  memory, composed entirely from already-existing endpoints (no new backend
+  routes needed for this one). `ProjectsPage`/`PortfolioHomePage` links
+  repointed here from `/runs?project_id=X`.
+- **G4. "Packs & settings" is view-only.** `[FIXED, scope changed]`
+  `PacksPage.tsx` itself is still intentionally read-only — packs are shared,
+  versioned, on-disk content, not per-deployment config, and the DB's `Pack`
+  table stays dormant by design (M4b decision). What design doc §11 actually
+  wanted (gate-policy defaults, driver config, budgets) shipped as **per-project**
+  settings instead: `Project` gained `default_driver`/`default_token_budget`/
+  `default_playbook_path`, editable via `PATCH /api/projects/{id}/settings` on
+  `ProjectDetailPage`'s new Settings section, and applied at run creation
+  (`NewRunForm` pre-fills from them; `token_budget` defaults from the project
+  unless overridden). Gate-policy defaults specifically stayed out — no stable
+  shape independent of which playbook a given run uses. G3+G4 are the frontend
+  face of A6.
+- **G5. No dedicated Metrics view (new finding, not in original audit).** `[FIXED]`
+  `MetricsPage` at `/metrics` — portfolio-wide comparison table, one row per
+  project, sorted by rework rate descending, per-row loading/error states.
+  Replaces the old inline `MetricsSummary` embed on `RunsHomePage`.
 
 What's compliant: stack matches (`React/Vite/TS` + Tailwind, real `EventSource`-based
 SSE per `useEventStream.ts`), and Portfolio home / Runs home / Run detail / Fleet
-view / Knowledge view all exist and route correctly. Run detail's panel layout
-matches design reasonably (Ribbon, DAG view, gates+artifacts combined into
-`GateCard`, event feed) apart from G1's missing chat half.
+view / Knowledge view / Project view / Metrics view / My Queue all exist and route
+correctly. Run detail's panel layout matches design reasonably (Ribbon, DAG view,
+gates+artifacts combined into `GateCard`, event feed) apart from G1's missing
+chat half — the only frontend finding still open.
 
 ## Note on likely root cause
 
-A1 (`/internal` API) and A4 (chat/notes system) are the remaining load-bearing
-gaps: G1/G2 (frontend) and the still-open half of E1 all trace back to A4 never
-existing, and A1 not existing constrains anything that would want an HTTP context
-boundary. A2 (`ClaudeCodeDriver`) is now built (see update note at top) but not yet
-the *default* anywhere — every actual run still executes against `FakeDriver`
-unless a caller explicitly opts into `--driver claude`/`codex`.
+A1 (`/internal` API) and A4 (chat/notes system) are the only remaining
+load-bearing gaps. G1 (frontend chat half) and the still-open half of E1 both
+trace back to A4 never existing; A1 not existing constrains anything that would
+want an HTTP context boundary, though nothing built so far has actually needed
+one. A2 (`ClaudeCodeDriver`) is built but not yet the *default* anywhere —
+every actual run still executes against `FakeDriver` unless a caller explicitly
+opts into `--driver claude`/`codex`. Every other Never-built/dormant/structural
+finding from the original audit is now closed; what's left is concentrated in
+exactly two places (A1, A4) plus the B-series substitutions, which are
+functional and deliberately not being "fixed."
