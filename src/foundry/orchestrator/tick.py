@@ -59,7 +59,7 @@ class Orchestrator:
         self._roles_by_id: dict[str, RoleSpec] = {r.id: r for r in pack.roles} if pack else {}
         self._unit_worktrees: dict[str, str] = {}
 
-    async def tick(self, run_id: str) -> TickResult:
+    async def tick(self, run_id: str, dispatch_agent_reviews: bool = True) -> TickResult:
         await self.reconcile(run_id)
         await self.apply_gate_decisions(run_id)
         await self.unblock(run_id)
@@ -68,7 +68,19 @@ class Orchestrator:
         await self._close_convoys(run_id)
         await self._check_convoy_interference(run_id)
         dispatched = await self.dispatch(run_id)
-        await self._dispatch_agent_reviews(run_id)
+        # With a driver that resolves synchronously (FakeDriver, no delay_s),
+        # `_dispatch_agent_reviews` would otherwise create AND resolve an
+        # agent-type gate within this same tick, so it's never observably
+        # pending to a concurrent reader -- unlike a human gate, which stays
+        # pending until an external decide_gate() call. With a real driver
+        # this isn't an issue: `stream_events` takes real wall-clock time,
+        # so the gate the line above just created is genuinely pending for
+        # the duration of that call. `dispatch_agent_reviews=False` lets a
+        # caller opt out of the auto-resolve step for a given tick (e.g. to
+        # seed a demo run that should stay parked on a pending agent-review
+        # gate) without changing default behavior for anyone else.
+        if dispatch_agent_reviews:
+            await self._dispatch_agent_reviews(run_id)
 
         units = await self.store.list_units(run_id)
         closed = sum(1 for u in units if u.status == "closed" and u.type == "task")

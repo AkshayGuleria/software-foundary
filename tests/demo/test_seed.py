@@ -33,3 +33,21 @@ async def test_seed_creates_at_least_one_closed_successful_run(tmp_path):
     assert all(u.status == "closed" for u in task_units)
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_seed_creates_runs_with_pending_human_and_agent_gates(tmp_path):
+    store = await _make_store(tmp_path)
+
+    await run_demo_seed(store, str(tmp_path / "demo-repos"))
+
+    all_gates = []
+    for run in await store.list_runs():
+        all_gates.extend(await store.list_gates_for_run(run.id))
+
+    pending_human = [g for g in all_gates if g.gate_type == "human" and g.decision == "pending"]
+    pending_agent = [g for g in all_gates if g.gate_type == "agent" and g.decision == "pending"]
+    assert pending_human, "expected at least one pending human gate in the seed data"
+    assert pending_agent, "expected at least one pending agent gate in the seed data"
+
+    await store.stop()
