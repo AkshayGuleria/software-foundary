@@ -1,5 +1,10 @@
 # Demo mode — design
 
+**Refined 2026-07-26:** this spec was originally written right after the
+metrics-view round shipped, before Project view (G3), per-project settings
+(G4), and My-queue (G2) existed. Refinement added two scope items those
+features need (below), and resolved both open design questions.
+
 ## Goal
 
 A one-command way to populate a throwaway SQLite database with realistic,
@@ -45,65 +50,64 @@ slice of a working deployment, all at once, that stays up and browsable.
 - A `foundry demo-seed --reset` flag (or equivalent) to wipe and re-seed
   idempotently, since running the command twice on the same db file should
   not double every row.
+- **At least one open `human_task` unit** (`type="human_task", status="open"`)
+  on one demo run — the simplest to construct deliberately is the
+  budget-exceeded case (a run with `token_budget` set low and `tokens_used`
+  already past it; `dispatch()` creates the unit itself once budget-exceeded
+  is detected, so this can ride the same real-orchestrator path as everything
+  else rather than needing a direct `Store` write). Without this, `QueuePage`'s
+  human-tasks section renders empty in the demo — the whole point of seed
+  data is that every dashboard view has real content.
+- **Varied per-project settings** — each demo project gets different
+  `default_driver`/`default_token_budget`/`default_playbook_path` values
+  (direct `Store`/`update_project` writes, not reachable through a playbook
+  run) so `ProjectDetailPage`'s Settings form and `NewRunForm`'s pre-fill
+  behavior have something real to show instead of every project sitting on
+  the same defaults.
 
 **Out of scope:**
 - Not a replacement for pytest fixtures — existing `tests/fixtures/` and
   `tests/*/fixtures/` stay exactly as they are, untouched.
 - Not wired to any real driver — demo data is either directly inserted via
   `Store` methods or produced by running real playbooks through the
-  orchestrator on `FakeDriver` (open question below), never `CodexDriver`/
-  `ClaudeCodeDriver`. No tokens, no network calls, ever.
+  orchestrator on `FakeDriver` (see design decision 1 below), never
+  `CodexDriver`/`ClaudeCodeDriver`. No tokens, no network calls, ever.
 - No auth/multi-tenant concerns — out of scope for the whole codebase until
   M5, demo mode doesn't change that.
 - Not a perpetual background data generator (no cron, no continuously
   "live" demo) — one seed, static afterward, matches how every other
   Foundry deployment behaves today.
 
-## Two open design questions worth resolving before a plan gets written
+## Design decisions (resolved 2026-07-26)
 
 **1. How is the data produced — direct `Store` writes, or real orchestrator runs on `FakeDriver`?**
 
-- *Direct writes* (construct `Project`/`Run`/`WorkUnit`/`Gate`/`Artifact`/
-  `Event` rows straight through `Store` methods, no `Orchestrator` involved):
-  fast, fully deterministic, easy to hit every state combination
-  deliberately (e.g. "a rejected-then-approved gate" is just two rows).
-  Risk: the data can silently drift out of sync with what the real engine
-  actually produces (a field the orchestrator always sets that the seed
-  script forgets), and it never exercises the real tick loop, so it proves
-  nothing about the engine — only about the dashboard's rendering.
-- *Real runs* (materialize real playbooks — reuse `packs/default/`'s
-  `sdlc_story.toml`/`bugfix.toml` — through a real `Orchestrator` on
-  `FakeDriver`, scripted to reject-then-approve on some runs): the data is
-  guaranteed structurally valid by construction, and doubles as a live
-  smoke test that the engine still produces sensible output. Slower, and
-  getting a *cancelled* run or a *paused* project still needs some direct
-  `Store` calls layered on top (those aren't reachable by just running a
-  playbook to completion).
-- **Recommendation:** hybrid — drive the bulk of run/gate/artifact data
-  through real `Orchestrator.run_to_completion()` calls on `FakeDriver`
-  (reusing the default pack's playbooks, scripting different `FakeStepScript`
-  outcomes per run to get the state variety), then apply direct `Store`
-  writes only for the states unreachable by construction (project
-  pause/archive, run cancellation, backdated `created_at` timestamps so the
-  changelog/metrics don't all cluster at the exact seed moment). This keeps
-  the "proves the engine still works" property for the common path while
-  not fighting the orchestrator to force states it doesn't naturally reach.
+**Decided: hybrid.** Drive the bulk of run/gate/artifact data through real
+`Orchestrator.run_to_completion()` calls on `FakeDriver` (reusing the
+default pack's playbooks, scripting different `FakeStepScript` outcomes per
+run to get the state variety) — this is guaranteed structurally valid by
+construction and doubles as a live smoke test that the engine still
+produces sensible output. Apply direct `Store` writes only for the states
+unreachable by construction: project pause/archive, run cancellation,
+backdated `created_at` timestamps (so the changelog/metrics don't all
+cluster at the exact seed moment), and the varied per-project settings
+added above. The budget-exceeded `human_task` unit rides the real-orchestrator
+path (set a low `token_budget` on one run, let `dispatch()` create the unit
+itself) rather than needing a direct write — the only human_task-adjacent
+state that *does* need a direct write is nothing, this one's free.
 
 **2. Where does the demo command live, and where does the toy on-disk repo come from?**
 
-- CLI: a new `foundry demo-seed` Typer command in `src/foundry/cli.py`
-  (matching the existing `run`/`events`/`serve`/`archive-events` commands)
-  vs. a standalone `scripts/seed_demo.py` outside the package. Recommend the
-  CLI command — it's the pattern every other "do a thing to a db" operation
-  in this codebase already follows, and it means `pip install`/`uv run
-  foundry demo-seed` just works with no separate script to discover.
-- Toy repo: generate a small synthetic Python package on the fly into a
-  temp/fixed directory (e.g. `.foundry-demo/toy-repo-N/`) each time
-  `demo-seed` runs, rather than committing a static fake codebase into this
-  repo. Generating it keeps the demo data self-contained (no risk of the
-  toy repo drifting from whatever DB rows reference it) and avoids adding
-  unrelated Python files to `software-foundary`'s own source tree that a
-  future contributor might mistake for real code.
+**Decided:** a new `foundry demo-seed` Typer command in `src/foundry/cli.py`,
+matching the existing `run`/`events`/`serve`/`archive-events` pattern — no
+separate script to discover, works via `uv run foundry demo-seed` like
+everything else. The toy on-disk repo is generated fresh each run into
+`.foundry-demo/toy-repo-N/` (small synthetic Python package, 10-20 files
+with genuine import relationships) rather than committed to this repo —
+keeps the demo data self-contained with no risk of drifting from whatever
+DB rows reference it, and avoids unrelated fake Python files in
+`software-foundary`'s own source tree that a future contributor might
+mistake for real code.
 
 ## Non-functional constraints carried over from the rest of the codebase
 
@@ -119,4 +123,4 @@ slice of a working deployment, all at once, that stays up and browsable.
 Exact seed data (which project names, how many of each state, exact fake
 lesson/pitfall text) and the toy repo's generated file/import structure are
 implementation-plan-level detail, not spec-level — the plan should pick
-concrete numbers once the two questions above are settled.
+concrete numbers consistent with the design decisions above.
