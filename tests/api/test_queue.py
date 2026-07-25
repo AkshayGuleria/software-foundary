@@ -27,10 +27,27 @@ async def test_queue_lists_pending_human_and_derived_gates_oldest_first(api_clie
     # call can produce timestamps too close together (or, on SQLite, in a
     # return order not guaranteed by insertion order absent ORDER BY) to
     # reliably prove sort-by-age otherwise.
+    #
+    # The endpoint sorts ascending by created_at (oldest first), so unit1's
+    # gate (older_human, must sort FIRST) needs the EARLIEST created_at, and
+    # unit4's gate (newer_derived, must sort LAST) needs the LATEST
+    # created_at. To make sure the test can only pass if the endpoint's own
+    # sort actually runs -- not by coincidentally matching SQLite's
+    # insertion-order fallback -- both the WorkUnit insertion order AND the
+    # Gate creation-call order are deliberately reversed relative to that
+    # created_at order below: unit4's WorkUnit is inserted first (and its
+    # gate created first), unit1's WorkUnit is inserted last (and its gate
+    # created last), even though unit1 has the earlier timestamp.
     t0 = dt.datetime(2026, 7, 20, 0, 0, 0, tzinfo=dt.UTC)
-    unit1, unit2, unit3, unit4 = await store.create_work_units(
+    unit4, unit2, unit3, unit1 = await store.create_work_units(
         [
-            WorkUnit(run_id=run.id, step_id="step1", type="task", status="open", created_at=t0),
+            WorkUnit(
+                run_id=run.id,
+                step_id="step4",
+                type="task",
+                status="open",
+                created_at=t0 + dt.timedelta(minutes=3),
+            ),
             WorkUnit(
                 run_id=run.id,
                 step_id="step2",
@@ -45,19 +62,16 @@ async def test_queue_lists_pending_human_and_derived_gates_oldest_first(api_clie
                 status="open",
                 created_at=t0 + dt.timedelta(minutes=2),
             ),
-            WorkUnit(
-                run_id=run.id,
-                step_id="step4",
-                type="task",
-                status="open",
-                created_at=t0 + dt.timedelta(minutes=3),
-            ),
+            WorkUnit(run_id=run.id, step_id="step1", type="task", status="open", created_at=t0),
         ]
     )
-    older_human = await store.create_gate(work_unit_id=unit1.id, gate_type="human", decision="pending")
+    # Gate creation order also reversed relative to created_at order: the
+    # gate that must sort LAST (newer_derived) is created first here, and
+    # the gate that must sort FIRST (older_human) is created last.
+    newer_derived = await store.create_gate(work_unit_id=unit4.id, gate_type="derived", decision="pending")
     await store.create_gate(work_unit_id=unit2.id, gate_type="human", decision="approved")  # not pending
     await store.create_gate(work_unit_id=unit3.id, gate_type="agent", decision="pending")  # not human/derived
-    newer_derived = await store.create_gate(work_unit_id=unit4.id, gate_type="derived", decision="pending")
+    older_human = await store.create_gate(work_unit_id=unit1.id, gate_type="human", decision="pending")
 
     resp = await client.get("/api/queue")
 
