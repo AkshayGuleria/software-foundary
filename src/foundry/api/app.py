@@ -15,6 +15,7 @@ from foundry.api.routes.metrics import router as metrics_router
 from foundry.api.routes.packs import router as packs_router
 from foundry.api.routes.portfolio import router as portfolio_router
 from foundry.api.routes.projects import router as projects_router
+from foundry.api.routes.queue import router as queue_router
 from foundry.api.routes.runs import router as runs_router
 from foundry.api.routes.sessions import router as sessions_router
 from foundry.api.routes.stream import router as stream_router
@@ -40,6 +41,7 @@ def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
     app.include_router(memory_router, prefix="/api")
     app.include_router(knowledge_router, prefix="/api")
     app.include_router(packs_router, prefix="/api")
+    app.include_router(queue_router, prefix="/api")
 
     @app.get("/api/_health")
     async def health() -> dict:
