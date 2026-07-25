@@ -137,4 +137,42 @@ describe("ProjectDetailPage", () => {
     const links = screen.getAllByRole("link").filter((el) => el.getAttribute("href")?.startsWith("/runs/"));
     expect(links.map((el) => el.getAttribute("href"))).toEqual(["/runs/r-new", "/runs/r-old"]);
   });
+
+  it("renders the KG graph and memory items for the project", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/projects/p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: { id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-07-21T00:00:00Z" },
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/projects/p1/kg-graph") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({ data: { nodes: ["a.py", "b.py"], edges: [{ from: "a.py", to: "b.py" }] }, paging: {} }),
+          });
+        }
+        if (url === "/api/memory?project_id=p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: [{ id: "m1", scope: "project", kind: "lesson", title: "Watch the pgid", body_md: "...", project_id: "p1", pack_id: null, source_run_id: null, created_at: "2026-07-21T00:00:00Z" }],
+              paging: {},
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }),
+    );
+
+    renderWithProviders("p1");
+
+    await waitFor(() => expect(screen.getByText("a.py")).toBeInTheDocument());
+    expect(screen.getByText("Watch the pgid")).toBeInTheDocument();
+  });
 });

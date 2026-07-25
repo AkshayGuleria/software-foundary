@@ -2,9 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getProject } from "../api/projects";
 import { getProjectMetrics } from "../api/metrics";
+import { getProjectKgGraph, listMemory } from "../api/knowledge";
 import { listRuns } from "../api/runs";
 import { metricsStats } from "../components/MetricsSummary";
 import ProjectLifecycleButtons from "../components/ProjectLifecycleButtons";
+import KgGraphView from "../components/KgGraphView";
+import MemoryBrowser from "../components/MemoryBrowser";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +25,16 @@ export default function ProjectDetailPage() {
   const { data: metrics } = useQuery({
     queryKey: ["project-metrics", projectId],
     queryFn: () => getProjectMetrics(projectId),
+    enabled: !!project,
+  });
+  const { data: graph } = useQuery({
+    queryKey: ["kg-graph", projectId],
+    queryFn: () => getProjectKgGraph(projectId),
+    enabled: !!project,
+  });
+  const { data: memory } = useQuery({
+    queryKey: ["memory", projectId],
+    queryFn: () => listMemory({ project_id: projectId }),
     enabled: !!project,
   });
 
@@ -80,6 +93,18 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Knowledge graph</h3>
+        <div className="overflow-x-auto">
+          {graph?.nodes && <KgGraphView nodes={graph.nodes} edges={graph.edges ?? []} />}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Memory</h3>
+        <MemoryBrowser items={memory ?? []} />
+      </div>
     </div>
   );
 }
