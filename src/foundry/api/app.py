@@ -11,6 +11,7 @@ from foundry.api.errors import (
     foundry_api_error_handler,
     request_validation_error_handler,
 )
+from foundry.api.routes.demo import router as demo_router
 from foundry.api.routes.gates import router as gates_router
 from foundry.api.routes.knowledge import router as knowledge_router
 from foundry.api.routes.memory import router as memory_router
@@ -58,6 +59,7 @@ def create_app(
     app.include_router(knowledge_router, prefix="/api")
     app.include_router(packs_router, prefix="/api")
     app.include_router(queue_router, prefix="/api")
+    app.include_router(demo_router, prefix="/api")
 
     @app.get("/api/_health")
     async def health() -> dict:
