@@ -154,6 +154,61 @@ class Store:
 
         await self.write(_op)
 
+    async def shift_run_timestamps(self, run_ids: list[str], delta: timedelta) -> None:
+        """Shift every timestamped row belonging to `run_ids` by `delta`.
+
+        Bulk sibling to `update_run`/`update_unit` -- used by demo seeding
+        (`demo/seed.py`) to backdate a whole project's slice of history in
+        one `write()` call instead of one round-trip per row, so a
+        changelog/timeline view doesn't cluster every project at the exact
+        seed moment. Covers `Run.created_at`/`closed_at`,
+        `WorkUnit.created_at`/`updated_at`, `Gate.decided_at`,
+        `Artifact.created_at`, and `Event.created_at` (`Gate` has no
+        `created_at` column to shift).
+
+        `WorkUnit.updated_at` is set explicitly here rather than left to its
+        `onupdate=utcnow` default: `onupdate` only fires for columns NOT
+        already present in the flush's SET clause, so assigning it
+        ourselves means the shifted value wins, not "now".
+        """
+
+        async def _op(session):
+            runs = (await session.execute(select(Run).where(Run.id.in_(run_ids)))).scalars().all()
+            for run in runs:
+                run.created_at = run.created_at + delta
+                if run.closed_at is not None:
+                    run.closed_at = run.closed_at + delta
+
+            units = (
+                (await session.execute(select(WorkUnit).where(WorkUnit.run_id.in_(run_ids)))).scalars().all()
+            )
+            for unit in units:
+                unit.created_at = unit.created_at + delta
+                unit.updated_at = unit.updated_at + delta
+
+            unit_ids = [u.id for u in units]
+            if unit_ids:
+                gates = (
+                    (await session.execute(select(Gate).where(Gate.work_unit_id.in_(unit_ids))))
+                    .scalars()
+                    .all()
+                )
+                for gate in gates:
+                    if gate.decided_at is not None:
+                        gate.decided_at = gate.decided_at + delta
+
+            artifacts = (
+                (await session.execute(select(Artifact).where(Artifact.run_id.in_(run_ids)))).scalars().all()
+            )
+            for artifact in artifacts:
+                artifact.created_at = artifact.created_at + delta
+
+            events = (await session.execute(select(Event).where(Event.run_id.in_(run_ids)))).scalars().all()
+            for event in events:
+                event.created_at = event.created_at + delta
+
+        await self.write(_op)
+
     # --- work units / deps ---
 
     async def create_work_units(self, units: list[WorkUnit]) -> list[WorkUnit]:
@@ -358,6 +413,16 @@ class Store:
             return ev.seq
 
         return await self.write(_op)
+
+    async def update_event(self, seq: int, **fields) -> None:
+        async def _op(session):
+            event = await session.get(Event, seq)
+            if event is None:
+                raise ValueError(f"Event {seq} not found")
+            for key, value in fields.items():
+                setattr(event, key, value)
+
+        await self.write(_op)
 
     async def list_events(self, run_id: str, after_seq: int = 0) -> list[Event]:
         async def _op(session):

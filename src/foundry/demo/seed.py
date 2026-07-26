@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import random
+from datetime import timedelta
 
 from foundry.demo.toy_repo import generate_toy_repo
 from foundry.drivers.fake import FakeDriver, FakeStepScript
@@ -26,6 +28,19 @@ _HAPPY_PATH_SCRIPT = {
     "integrate": FakeStepScript(artifact={"merged": True}),
     "diagnose": FakeStepScript(artifact={"root_cause": "off-by-one in pagination"}),
     "fix": FakeStepScript(artifact={"diff": "- page - 1\n+ page", "files": ["reports/paginate.py"]}),
+}
+
+# Per-project backdating offsets -- spreads each project's whole seeded
+# slice across different points in the past (spec design decision 1: avoid
+# every row clustering at the exact seed moment) so a changelog/timeline
+# view visibly spreads out. Values are arbitrary but deliberately distinct
+# and at least a few days apart.
+_PROJECT_BACKDATE_OFFSETS = {
+    "acme-reports": timedelta(days=18),
+    "beta-dashboard": timedelta(days=11),
+    "gamma-api": timedelta(days=6),
+    "delta-billing": timedelta(days=2),
+    "epsilon-notifications": timedelta(days=25),
 }
 
 
@@ -366,6 +381,43 @@ class _ReviewGateHoldOrchestrator(Orchestrator):
         return await super().tick(run_id, dispatch_agent_reviews=False)
 
 
+async def _widen_gate_approval_latencies(store: Store, run_ids: list[str], rng: random.Random) -> None:
+    """Push each decided gate's decision Event forward relative to its
+    creation Event, so `compute_project_metrics()`'s `approval_latency_seconds`
+    (`metrics/rollup.py`) isn't ~0 for every seed run. During seeding,
+    FakeDriver's synchronous `stream_events` means a `gate.created` and its
+    matching `gate.approved`/`gate.rejected` event land within milliseconds
+    of each other -- fine for a script, but it defeats the point of a
+    latency metric meant to vary across a comparison view.
+
+    Mirrors `rollup.py`'s own gate_id correlation (`payload_json["gate_id"]`)
+    exactly, then nudges each decided event's `created_at` forward by a
+    random offset via the narrow `Store.update_event` primitive. This stays
+    in seed.py (not store.py) because the gate_id correlation is seed/metrics
+    business logic, not a generic storage capability.
+    """
+    created_by_gate: dict[str, object] = {}
+    decided_by_gate: dict[str, object] = {}
+    for run_id in run_ids:
+        for ev in await store.list_events(run_id):
+            gate_id = (ev.payload_json or {}).get("gate_id")
+            if gate_id is None:
+                continue
+            if ev.type == "gate.created":
+                created_by_gate[gate_id] = ev
+            elif ev.type in ("gate.approved", "gate.rejected"):
+                decided_by_gate[gate_id] = ev
+
+    for gate_id, created_ev in created_by_gate.items():
+        decided_ev = decided_by_gate.get(gate_id)
+        if decided_ev is None:
+            continue
+        # 5 minutes .. 2 hours -- a plausible human-response range, clearly
+        # non-zero and varied without needing a fancier distribution.
+        offset = timedelta(seconds=rng.randint(300, 7200))
+        await store.update_event(decided_ev.seq, created_at=created_ev.created_at + offset)
+
+
 async def run_demo_seed(store: Store, base_dir: str) -> None:
     """Populate `store` with a believable slice of a working deployment.
 
@@ -429,9 +481,32 @@ async def run_demo_seed(store: Store, base_dir: str) -> None:
     await store.update_project(delta.id, status="paused")
     await store.update_project(epsilon.id, status="archived")
 
-    # acme and epsilon only got one run each above -- give both a second
-    # run so every project has 2+ runs (spec: "2-4 runs spanning every
-    # state"), reusing Task 3/4's helpers as-is since neither hardcodes
-    # which project it's called with.
+    # acme, delta, and epsilon only got one run each above -- give all three
+    # a second run so every project genuinely has 2+ runs (spec: "2-4 runs
+    # spanning every state"), reusing Task 3/4's helpers as-is since none of
+    # them hardcode which project they're called with. delta is "paused",
+    # so a second run that itself got cancelled mid-flight reads more
+    # sensibly than reopening it with a fresh pending-review run.
     await _seed_active_pending_human_gate_run(store, acme, acme_dir)
+    await _seed_cancelled_run(store, delta, delta_dir)
     await _seed_cancelled_run(store, epsilon, epsilon_dir)
+
+    # Backdate each project's whole seeded slice to a different point in the
+    # past (spec design decision 1) so a changelog/timeline view doesn't
+    # cluster every project at the exact seed moment, and widen each
+    # decided gate's approval/rejection latency so
+    # compute_project_metrics()'s approval_latency_seconds is genuinely
+    # non-zero and varied across projects instead of landing at ~0
+    # everywhere (FakeDriver resolves gates synchronously during seeding).
+    # Done once at the very end, after every run (including the extra runs
+    # just above) exists, rather than interleaved per-project above, so
+    # this is a single pass over each project's *complete* run set.
+    rng = random.Random(1337)  # fixed seed -- deterministic demo data across re-seeds
+    for proj in (acme, beta, gamma, delta, epsilon):
+        offset = _PROJECT_BACKDATE_OFFSETS[proj.name]
+        project_runs = await store.list_runs(project_id=proj.id)
+        run_ids = [r.id for r in project_runs]
+        if not run_ids:
+            continue
+        await store.shift_run_timestamps(run_ids, -offset)
+        await _widen_gate_approval_latencies(store, run_ids, rng)
