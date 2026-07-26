@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from foundry.api.errors import (
     FoundryApiError,
@@ -23,10 +26,23 @@ from foundry.api.scheduler import Scheduler
 from foundry.store.store import Store
 
 
-def create_app(store: Store, scheduler: Scheduler) -> FastAPI:
+def create_app(
+    store: Store,
+    scheduler: Scheduler,
+    engine: AsyncEngine | None = None,
+    original_db_path: str | None = None,
+    demo_db_path: str = ".foundry-demo/demo.db",
+    demo_repos_dir: str = ".foundry-demo/repos",
+) -> FastAPI:
     app = FastAPI(title="Foundry API")
     app.state.store = store
     app.state.scheduler = scheduler
+    app.state.engine = engine
+    app.state.original_db_path = original_db_path
+    app.state.current_db_path = original_db_path
+    app.state.demo_db_path = demo_db_path
+    app.state.demo_repos_dir = demo_repos_dir
+    app.state.demo_swap_lock = asyncio.Lock()
 
     app.add_exception_handler(FoundryApiError, foundry_api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)

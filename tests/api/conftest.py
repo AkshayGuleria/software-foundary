@@ -68,3 +68,39 @@ async def sse_api_client(tmp_path):
 
     await store.stop()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def demo_api_client(tmp_path):
+    """Like `api_client`, but wired for demo-mode hot-swap testing: a real
+    `original_db_path`/`engine`, and demo db/repos paths under `tmp_path`
+    (never the real `.foundry-demo/` default -- that would pollute the repo
+    working directory when tests run from the repo root).
+    """
+    original_db = str(tmp_path / "foundry.db")
+    demo_db = str(tmp_path / "demo" / "demo.db")
+    demo_repos = str(tmp_path / "demo" / "repos")
+
+    engine = make_engine(original_db)
+    await init_db(engine)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+    scheduler = Scheduler(store)
+    app = create_app(
+        store,
+        scheduler,
+        engine=engine,
+        original_db_path=original_db,
+        demo_db_path=demo_db,
+        demo_repos_dir=demo_repos,
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client, app
+
+    # Read from app.state, not the `store`/`engine` locals -- same reasoning
+    # as _serve's shutdown fix: a swap during the test replaces these.
+    await app.state.store.stop()
+    if app.state.engine is not None:
+        await app.state.engine.dispose()

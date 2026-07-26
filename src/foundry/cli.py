@@ -185,12 +185,19 @@ async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
 async def _serve(db: str, host: str, port: int) -> None:
     engine, store, scheduler = await build_store_and_scheduler(db)
 
-    api_app = create_app(store, scheduler)
+    api_app = create_app(store, scheduler, engine=engine, original_db_path=db)
     config = uvicorn.Config(api_app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
 
     try:
         await server.serve()
     finally:
-        await scheduler.stop()
-        await store.stop()
+        # Read from api_app.state, not the `scheduler`/`store` locals above:
+        # once the demo-mode hot-swap routes exist (Task 3-4), a swap
+        # reassigns app.state.store/scheduler to brand-new instances built
+        # for a different db. Stopping the *original* local-variable
+        # instances at shutdown would leave whichever instances are
+        # actually live (and holding the real writer task / tick loop) never
+        # cleanly stopped.
+        await api_app.state.scheduler.stop()
+        await api_app.state.store.stop()
