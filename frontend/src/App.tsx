@@ -1,4 +1,5 @@
 import { NavLink, Route, Routes } from "react-router-dom";
+import DemoModeToggle from "./components/DemoModeToggle";
 import FleetPage from "./pages/FleetPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import MetricsPage from "./pages/MetricsPage";
@@ -41,6 +42,7 @@ export default function App() {
             Packs
           </NavLink>
         </nav>
+        <DemoModeToggle />
       </header>
       <main className="p-6">
         <Routes>
