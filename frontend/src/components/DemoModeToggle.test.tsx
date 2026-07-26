@@ -58,14 +58,16 @@ describe("DemoModeToggle", () => {
   });
 
   it("activating clears the cache (triggering a status refetch) and navigates to /", async () => {
+    let active = false;
     const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/demo/status" && !init) {
         return Promise.resolve({
           ok: true, status: 200,
-          json: async () => ({ data: { active: false, db_path: "/tmp/foundry.db" }, paging: {} }),
+          json: async () => ({ data: { active, db_path: active ? ".foundry-demo/demo.db" : "/tmp/foundry.db" }, paging: {} }),
         });
       }
       if (url === "/api/demo/activate") {
+        active = true;
         return Promise.resolve({
           ok: true, status: 200,
           json: async () => ({ data: { active: true, db_path: ".foundry-demo/demo.db" }, paging: {} }),
@@ -85,8 +87,8 @@ describe("DemoModeToggle", () => {
 
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/"));
     // Cache clear -> the toggle's own status query loses its cached data and
-    // refetches; the mock's status branch now needs to have been hit again
-    // (activate response) with an updated status reflected in the button.
+    // refetches; the mock tracks that /activate was called, so this refetch
+    // of /api/demo/status now reflects the post-activation state.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /exit demo mode/i })).toBeInTheDocument(),
     );

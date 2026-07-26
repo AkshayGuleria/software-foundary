@@ -1,23 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { activateDemo, deactivateDemo, getDemoStatus, reseedDemo } from "../api/demo";
-import type { DemoStatus } from "../api/types";
 
 export default function DemoModeToggle() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: status } = useQuery({ queryKey: ["demo-status"], queryFn: getDemoStatus });
 
-  const afterSwap = (data: DemoStatus) => {
+  const afterSwap = () => {
     // The entire database underneath the app just changed -- everything is
     // potentially stale, not just one query key. A deep-linked run/project
     // id from before the swap won't exist against the new db, so send the
-    // user back to a page that doesn't depend on one. The demo-status key
-    // itself is excluded from the wipe: we already know its fresh value
-    // from the mutation response, and clearing it too would trigger a
-    // redundant background refetch racing with the setQueryData below.
-    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "demo-status" });
-    queryClient.setQueryData(["demo-status"], data);
+    // user back to a page that doesn't depend on one.
+    queryClient.clear();
     navigate("/");
   };
 
