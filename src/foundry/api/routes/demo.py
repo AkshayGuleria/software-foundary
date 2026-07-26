@@ -19,7 +19,7 @@ class DemoStatusOut(BaseModel):
 def _status_out(app: FastAPI) -> DemoStatusOut:
     current = app.state.current_db_path
     original = app.state.original_db_path
-    return DemoStatusOut(active=current != original, db_path=current)
+    return DemoStatusOut(active=current != original, db_path=current or "")
 
 
 async def _swap_database(
@@ -29,8 +29,19 @@ async def _swap_database(
     fresh engine/Store/Scheduler for `target_db_path` (recovering any active
     runs into it), seed it if empty, and reassign app.state -- all under a
     lock so two swap requests in flight at once can't race each other.
+
+    If building/seeding the new database fails, app.state is rebuilt against
+    the database the server was already successfully running before this
+    attempt, rather than left pointing at the just-stopped/disposed old
+    store -- which would otherwise hang every subsequent request forever
+    (Store.stop() never resumes its writer loop).
     """
     async with app.state.demo_swap_lock:
+        if not reset and app.state.current_db_path == target_db_path:
+            return
+
+        previous_db_path = app.state.current_db_path
+
         await app.state.scheduler.stop()
         await app.state.store.stop()
         if app.state.engine is not None:
@@ -39,20 +50,28 @@ async def _swap_database(
         if reset:
             reset_sqlite_db(target_db_path, repos_dir)
 
-        engine, store, scheduler = await build_store_and_scheduler(target_db_path)
+        try:
+            engine, store, scheduler = await build_store_and_scheduler(target_db_path)
 
-        if seed_if_empty:
-            projects = await store.list_projects()
-            if not projects:
-                await run_demo_seed(store, repos_dir)
-                # `build_store_and_scheduler` already ran recovery against the
-                # (then-empty) db before seeding wrote any rows, so any run
-                # the seed leaves in status="active" (pending-gate scenarios)
-                # never got registered with the scheduler above. Recover
-                # again now that those rows exist -- `Scheduler.register` is
-                # safe to call against an already-started scheduler, it just
-                # populates `_orchestrators`, read fresh on every tick.
-                await recover_active_runs(store, scheduler)
+            if seed_if_empty:
+                projects = await store.list_projects()
+                if not projects:
+                    await run_demo_seed(store, repos_dir)
+                    # `build_store_and_scheduler` already ran recovery against the
+                    # (then-empty) db before seeding wrote any rows, so any run
+                    # the seed leaves in status="active" (pending-gate scenarios)
+                    # never got registered with the scheduler above. Recover
+                    # again now that those rows exist -- `Scheduler.register` is
+                    # safe to call against an already-started scheduler, it just
+                    # populates `_orchestrators`, read fresh on every tick.
+                    await recover_active_runs(store, scheduler)
+        except Exception:
+            engine, store, scheduler = await build_store_and_scheduler(previous_db_path)
+            app.state.engine = engine
+            app.state.store = store
+            app.state.scheduler = scheduler
+            app.state.current_db_path = previous_db_path
+            raise
 
         app.state.engine = engine
         app.state.store = store
