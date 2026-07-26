@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 
 import typer
 import uvicorn
 
 from foundry.api.app import create_app
-from foundry.api.scheduler import Scheduler
+from foundry.api.bootstrap import build_store_and_scheduler, reset_sqlite_db
 from foundry.demo.seed import run_demo_seed
 from foundry.drivers.factory import make_driver
 from foundry.kg.service import build_kg
@@ -171,10 +170,7 @@ def demo_seed(
 
 async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
     if reset:
-        for path in (db, f"{db}-wal", f"{db}-shm"):
-            if os.path.exists(path):
-                os.remove(path)
-        shutil.rmtree(repos_dir, ignore_errors=True)
+        reset_sqlite_db(db, repos_dir)
 
     engine = make_engine(db)
     await init_db(engine)
@@ -186,46 +182,8 @@ async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
     await store.stop()
 
 
-async def _recover_active_runs(store: Store, scheduler: Scheduler) -> None:
-    """Re-register every `status="active"` run with the scheduler on startup.
-
-    Split out from `_serve` so it's directly testable without standing up a
-    live uvicorn server: this is the code path responsible for rehydrating
-    each run's persisted `gate_overrides_json` back into its Orchestrator
-    (via `Scheduler.register`'s `gate_overrides` kwarg) after a restart --
-    without it, a run created with gate overrides would silently lose them
-    and any gate for a step created after the restart would revert to
-    requiring manual approval.
-    """
-    active_runs = await store.list_runs(status="active")
-    for active_run in active_runs:
-        try:
-            playbook = load_playbook(active_run.playbook_ref)
-        except (PlaybookLoadError, PlaybookLintError):
-            continue  # playbook file moved/changed since the run started; skip, don't crash startup
-        project = await store.get_project(active_run.project_id)
-        project_path = project.path if project is not None else "."
-        scheduler.register(
-            active_run.id,
-            make_driver(active_run.driver, playbook),
-            playbook,
-            gate_overrides=active_run.gate_overrides_json or None,
-            project_path=project_path,
-            worktree_manager=WorktreeManager(base_dir=os.path.join(project_path, ".foundry", "worktrees")),
-            kg_snapshot=await asyncio.to_thread(build_kg, project_path),
-            pack=resolve_pack_manifest(active_run.playbook_ref),
-        )
-
-
 async def _serve(db: str, host: str, port: int) -> None:
-    engine = make_engine(db)
-    await init_db(engine)
-    store = Store(engine, make_sessionmaker(engine))
-    await store.start()
-
-    scheduler = Scheduler(store)
-    await _recover_active_runs(store, scheduler)
-    await scheduler.start()
+    engine, store, scheduler = await build_store_and_scheduler(db)
 
     api_app = create_app(store, scheduler)
     config = uvicorn.Config(api_app, host=host, port=port, log_level="info")

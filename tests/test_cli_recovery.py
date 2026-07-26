@@ -1,7 +1,7 @@
 import pytest
 
+from foundry.api.bootstrap import recover_active_runs
 from foundry.api.scheduler import Scheduler
-from foundry.cli import _recover_active_runs
 from foundry.store.db import init_db, make_engine, make_sessionmaker
 from foundry.store.store import Store
 
@@ -26,7 +26,7 @@ async def test_recover_active_runs_rehydrates_persisted_gate_overrides(tmp_path)
     assert run.status == "active"  # sanity: the recovery loop only picks up active runs
 
     scheduler = Scheduler(store)
-    await _recover_active_runs(store, scheduler)
+    await recover_active_runs(store, scheduler)
 
     orchestrator = scheduler._orchestrators[run.id]
     assert orchestrator.gate_overrides == {"implement": "approved"}
@@ -43,7 +43,7 @@ async def test_recover_active_runs_with_no_overrides_registers_with_none(tmp_pat
     # the Orchestrator, not crash or leave it None-vs-{} inconsistent.
 
     scheduler = Scheduler(store)
-    await _recover_active_runs(store, scheduler)
+    await recover_active_runs(store, scheduler)
 
     orchestrator = scheduler._orchestrators[run.id]
     assert orchestrator.gate_overrides == {}
@@ -59,7 +59,7 @@ async def test_recover_active_runs_skips_non_active_runs(tmp_path):
     await store.update_run(run.id, status="closed")
 
     scheduler = Scheduler(store)
-    await _recover_active_runs(store, scheduler)
+    await recover_active_runs(store, scheduler)
 
     assert run.id not in scheduler._orchestrators
 
@@ -73,7 +73,7 @@ async def test_recover_active_runs_reconstructs_the_persisted_driver(tmp_path):
     run = await store.create_run(project.id, FIXTURE, "recovered run", driver="codex")
 
     scheduler = Scheduler(store)
-    await _recover_active_runs(store, scheduler)
+    await recover_active_runs(store, scheduler)
 
     orchestrator = scheduler._orchestrators[run.id]
     from foundry.drivers.codex import CodexDriver
