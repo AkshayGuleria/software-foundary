@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 
@@ -5,6 +6,8 @@ from typer.testing import CliRunner
 
 from foundry.cli import app
 from foundry.orchestrator.worktrees import _git_env
+from foundry.store.db import make_engine, make_sessionmaker
+from foundry.store.store import Store
 
 runner = CliRunner()
 
@@ -124,3 +127,39 @@ def test_demo_seed_refuses_to_run_without_an_explicit_db_path():
     # Typer's own missing-required-option handling is enough here -- no
     # default that could silently point at a real foundry.db.
     assert result.exit_code != 0
+
+
+async def _count_projects_and_runs(db_path: str) -> tuple[int, int]:
+    engine = make_engine(db_path)
+    store = Store(engine, make_sessionmaker(engine))
+    await store.start()
+    projects = await store.list_projects()
+    runs = await store.list_runs()
+    await store.stop()
+    return len(projects), len(runs)
+
+
+def test_demo_seed_reset_flag_reseeds_idempotently_instead_of_doubling_rows(tmp_path):
+    db_path = str(tmp_path / "demo.db")
+    repos_dir = str(tmp_path / "demo-repos")
+
+    first = runner.invoke(app, ["demo-seed", "--db", db_path, "--repos-dir", repos_dir])
+    assert first.exit_code == 0, first.output
+    first_projects, first_runs = asyncio.run(_count_projects_and_runs(db_path))
+    assert first_projects == 5
+
+    # Without --reset, seeding again on the same db file blows up on
+    # `projects.name`'s UNIQUE constraint -- confirming the pre-fix bug is
+    # even worse than silent row doubling, it's a hard crash.
+    second = runner.invoke(app, ["demo-seed", "--db", db_path, "--repos-dir", repos_dir])
+    assert second.exit_code != 0
+
+    # --reset wipes the db (and repos dir) first, so this is equivalent to a
+    # fresh, first-time seed -- project/run counts match the first seed
+    # exactly, not doubled and not left in the crashed second attempt's
+    # partial state.
+    third = runner.invoke(app, ["demo-seed", "--db", db_path, "--repos-dir", repos_dir, "--reset"])
+    assert third.exit_code == 0, third.output
+    third_projects, third_runs = asyncio.run(_count_projects_and_runs(db_path))
+    assert third_projects == first_projects == 5
+    assert third_runs == first_runs

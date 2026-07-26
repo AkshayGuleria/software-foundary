@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 
 import typer
 import uvicorn
@@ -160,12 +161,21 @@ def serve(db: str = "foundry.db", host: str = "127.0.0.1", port: int = 8000) -> 
 def demo_seed(
     db: str = typer.Option(..., "--db", help="Path to the demo SQLite db (required, no default)"),
     repos_dir: str = ".foundry-demo",
+    reset: bool = typer.Option(
+        False, "--reset", help="Wipe the db (and repos dir) before seeding, for idempotent re-seeding"
+    ),
 ) -> None:
-    asyncio.run(_demo_seed(db, repos_dir))
+    asyncio.run(_demo_seed(db, repos_dir, reset))
     typer.echo(f"seeded {db}")
 
 
-async def _demo_seed(db: str, repos_dir: str) -> None:
+async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
+    if reset:
+        for path in (db, f"{db}-wal", f"{db}-shm"):
+            if os.path.exists(path):
+                os.remove(path)
+        shutil.rmtree(repos_dir, ignore_errors=True)
+
     engine = make_engine(db)
     await init_db(engine)
     store = Store(engine, make_sessionmaker(engine))
