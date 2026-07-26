@@ -4,6 +4,7 @@ from fastapi import APIRouter, FastAPI, Request
 from pydantic import BaseModel
 
 from foundry.api.bootstrap import build_store_and_scheduler, recover_active_runs, reset_sqlite_db
+from foundry.api.errors import ConflictError
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.demo.seed import run_demo_seed
 
@@ -69,5 +70,25 @@ async def activate_demo(request: Request) -> ApiResponse[DemoStatusOut]:
     app = request.app
     await _swap_database(
         app, app.state.demo_db_path, reset=False, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
+    )
+    return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())
+
+
+@router.post("/demo/deactivate")
+async def deactivate_demo(request: Request) -> ApiResponse[DemoStatusOut]:
+    app = request.app
+    if app.state.original_db_path is None:
+        raise ConflictError("no original database configured for this server")
+    await _swap_database(app, app.state.original_db_path, reset=False, seed_if_empty=False)
+    return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())
+
+
+@router.post("/demo/reseed")
+async def reseed_demo(request: Request) -> ApiResponse[DemoStatusOut]:
+    app = request.app
+    if app.state.current_db_path != app.state.demo_db_path:
+        raise ConflictError("demo mode is not active")
+    await _swap_database(
+        app, app.state.demo_db_path, reset=True, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
     )
     return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())
