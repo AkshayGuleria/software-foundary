@@ -183,3 +183,8 @@ export interface Queue {
   gates: GateQueueItem[];
   human_tasks: HumanTaskQueueItem[];
 }
+
+export interface DemoStatus {
+  active: boolean;
+  db_path: string;
+}
