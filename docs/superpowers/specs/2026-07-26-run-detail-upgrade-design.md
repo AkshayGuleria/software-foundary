@@ -123,10 +123,19 @@ data client-side (no new fetches except the Session log tab):
   today's flat gates list — the drawer doesn't duplicate gate-decision
   logic, it reuses the component).
 - **Session log** — fetched from the new backend endpoint (below),
-  filtered to `work_unit_id === selectedUnit.id`, rendered as a simple
-  list (driver, model, status, token counts, started/ended timestamps) —
-  no new component needed beyond a small inline list, matching the
-  existing `FleetPage` list's visual weight.
+  filtered to `work_unit_id === selectedUnit.owner_session_id` (**not**
+  `selectedUnit.id`: a `SessionRow` always attaches to a session-type
+  `WorkUnit`, never the task-type unit the drawer is scoped to — a
+  correction found during implementation planning, not designed
+  correctly here originally; see the implementation plan's Task 5 for
+  the full reasoning). This only surfaces the task's current/latest
+  session, not full multi-attempt retry history, since nothing links a
+  past attempt's session back to the task once `owner_session_id` is
+  reassigned on retry — accepted as a real scope limit rather than a
+  reason to add a schema change. Rendered as a simple list (driver,
+  model, status, token counts, started/ended timestamps) — no new
+  component needed beyond a small inline list, matching the existing
+  `FleetPage` list's visual weight.
 
 **4. New backend endpoint: per-run session history.**
 
