@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import DagView from "./DagView";
 import type { WorkUnit } from "../api/types";
 
@@ -24,7 +25,7 @@ describe("DagView", () => {
     expect(screen.getAllByTestId("dag-edge")).toHaveLength(1);
   });
 
-  it("positions a unit strictly after everything it depends on (topological level)", () => {
+  it("positions a unit strictly after everything it depends on (topological rank)", () => {
     const units: WorkUnit[] = [
       unit({ id: "01J1", step_id: "a", status: "closed" }),
       unit({ id: "01J2", step_id: "b", status: "closed" }),
@@ -59,5 +60,25 @@ describe("DagView", () => {
     const soloNode = screen.getByTestId("dag-node-01J3");
     expect(convoyNode.getAttribute("data-convoy")).toBe("01JC1");
     expect(soloNode.getAttribute("data-convoy")).toBeNull();
+  });
+
+  it("calls onNodeClick with the clicked unit", async () => {
+    const onNodeClick = vi.fn();
+    const units: WorkUnit[] = [unit({ id: "01J1", step_id: "implement", status: "closed" })];
+    render(<DagView units={units} deps={[]} onNodeClick={onNodeClick} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("dag-node-01J1"));
+
+    expect(onNodeClick).toHaveBeenCalledWith(units[0]);
+  });
+
+  it("does not throw when onNodeClick is not provided", async () => {
+    const units: WorkUnit[] = [unit({ id: "01J1", step_id: "implement", status: "closed" })];
+    render(<DagView units={units} deps={[]} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("dag-node-01J1"));
+    // no assertion needed beyond "didn't throw" -- the click must be a safe no-op
   });
 });
