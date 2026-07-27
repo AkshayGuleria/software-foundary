@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { decideGate } from "../api/gates";
-import { cancelRun, getRunArtifacts, getRunDetail, getRunGraph } from "../api/runs";
+import { cancelRun, getRunArtifacts, getRunDetail, getRunGraph, getRunSessions } from "../api/runs";
+import type { WorkUnit } from "../api/types";
 import DagView from "../components/DagView";
 import EventFeed from "../components/EventFeed";
 import GateCard from "../components/GateCard";
 import Ribbon from "../components/Ribbon";
+import UnitDrawer from "../components/UnitDrawer";
 import { useEventStream } from "../hooks/useEventStream";
 
 export default function RunDetailPage() {
@@ -14,18 +16,17 @@ export default function RunDetailPage() {
   const runId = id!;
   const queryClient = useQueryClient();
   const events = useEventStream(runId);
+  const [selectedUnit, setSelectedUnit] = useState<WorkUnit | null>(null);
 
   const { data: detail, isLoading } = useQuery({ queryKey: ["run", runId], queryFn: () => getRunDetail(runId) });
   const { data: artifacts } = useQuery({ queryKey: ["run-artifacts", runId], queryFn: () => getRunArtifacts(runId) });
   const { data: graph } = useQuery({ queryKey: ["run-graph", runId], queryFn: () => getRunGraph(runId) });
+  const { data: sessions } = useQuery({
+    queryKey: ["run-sessions", runId],
+    queryFn: () => getRunSessions(runId),
+    enabled: selectedUnit !== null, // no need to fetch session history until the drawer is actually open
+  });
 
-  // The scheduler drives run progress in the background (new gates, artifacts,
-  // and unit status all change outside of any request this page makes). The
-  // live feed is the only signal that something changed server-side, so treat
-  // each incoming event as a cue to refetch the run's derived state — without
-  // this, the ribbon, gates/artifacts panel, and DAG go stale the moment progress
-  // happens off the back of a decision made on some other page (or by the
-  // scheduler ticking on its own), even though the feed keeps scrolling.
   useEffect(() => {
     if (events.length === 0) return;
     queryClient.invalidateQueries({ queryKey: ["run", runId] });
@@ -74,7 +75,7 @@ export default function RunDetailPage() {
         </button>
       </div>
 
-      <Ribbon units={detail.units} gates={detail.gates} />
+      <Ribbon units={detail.units} gates={detail.gates} onSelectUnit={setSelectedUnit} />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-3">
@@ -100,9 +101,21 @@ export default function RunDetailPage() {
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">DAG</h3>
           <div className="overflow-x-auto">
-            <DagView units={graph.units} deps={graph.deps} />
+            <DagView units={graph.units} deps={graph.deps} onNodeClick={setSelectedUnit} />
           </div>
         </div>
+      )}
+
+      {selectedUnit && (
+        <UnitDrawer
+          unit={selectedUnit}
+          events={events}
+          artifacts={artifacts ?? []}
+          gates={detail.gates}
+          sessions={sessions ?? []}
+          onClose={() => setSelectedUnit(null)}
+          onDecideGate={(gateId, decision, feedback) => decideMutation.mutate({ gateId, decision, feedback })}
+        />
       )}
     </div>
   );

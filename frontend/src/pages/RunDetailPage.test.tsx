@@ -124,4 +124,35 @@ describe("RunDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText(/default@0\.1\.0/)).toBeInTheDocument());
   });
+
+  it("opens the unit drawer when a ribbon step is clicked, showing its gate", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === "/api/runs/01JR1") {
+        return Promise.resolve({
+          ok: true, status: 200,
+          json: async () => ({
+            data: {
+              run: { id: "01JR1", project_id: "01JP1", playbook_ref: "demo.toml", title: "demo run", status: "active", created_at: "2026-07-21T00:00:00Z" },
+              units: [{ id: "01JU1", step_id: "implement", type: "task", status: "closed", attempt: 0, owner_session_id: null }],
+              gates: [{ id: "01JG1", work_unit_id: "01JU1", gate_type: "human", decision: "pending" }],
+            },
+            paging: {},
+          }),
+        });
+      }
+      if (url === "/api/runs/01JR1/graph") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { units: [], deps: [] }, paging: {} }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+    });
+
+    renderPage("01JR1");
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId("ribbon-step-01JU1")).toBeInTheDocument());
+    await user.click(screen.getByTestId("ribbon-step-01JU1"));
+
+    await waitFor(() => expect(screen.getAllByText(/implement/).length).toBeGreaterThan(1));
+    expect(screen.getAllByRole("button", { name: /approve/i }).length).toBeGreaterThan(0);
+  });
 });

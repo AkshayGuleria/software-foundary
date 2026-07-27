@@ -185,6 +185,13 @@ export interface Queue {
   human_tasks: HumanTaskQueueItem[];
 }
 
+export interface FeedEventLike {
+  seq: number;
+  type: string;
+  unit_id: string | null;
+  payload: unknown;
+}
+
 export interface DemoStatus {
   active: boolean;
   db_path: string;
