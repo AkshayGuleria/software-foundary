@@ -42,4 +42,31 @@ describe("GateCard", () => {
     render(<GateCard gate={{ ...pendingHumanGate, decision: "approved" }} artifact={undefined} onDecide={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
   });
+
+  it("includes selected chips alongside free text in the rejection feedback", async () => {
+    const onDecide = vi.fn();
+    render(<GateCard gate={pendingHumanGate} artifact={undefined} onDecide={onDecide} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /reject/i }));
+    await user.click(screen.getByRole("button", { name: /missing tests/i }));
+    await user.type(screen.getByLabelText(/feedback/i), "add coverage");
+    await user.click(screen.getByRole("button", { name: /submit rejection/i }));
+
+    expect(onDecide).toHaveBeenCalledWith("rejected", { chips: ["missing tests"], text: "add coverage" });
+  });
+
+  it("deselects a chip on a second click", async () => {
+    const onDecide = vi.fn();
+    render(<GateCard gate={pendingHumanGate} artifact={undefined} onDecide={onDecide} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /reject/i }));
+    await user.click(screen.getByRole("button", { name: /missing tests/i }));
+    await user.click(screen.getByRole("button", { name: /missing tests/i }));
+    await user.type(screen.getByLabelText(/feedback/i), "nvm");
+    await user.click(screen.getByRole("button", { name: /submit rejection/i }));
+
+    expect(onDecide).toHaveBeenCalledWith("rejected", { chips: [], text: "nvm" });
+  });
 });

@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { Artifact, Gate } from "../api/types";
 import ArtifactCard from "./ArtifactCard";
 
+const REJECTION_CHIPS = ["missing tests", "wrong approach", "incomplete", "needs docs"];
+
 export default function GateCard({
   gate,
   artifact,
@@ -13,6 +15,11 @@ export default function GateCard({
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+  const [selectedChips, setSelectedChips] = useState<string[]>([]);
+
+  function toggleChip(chip: string) {
+    setSelectedChips((prev) => (prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]));
+  }
 
   return (
     <div className="rounded border border-slate-800 p-3">
@@ -53,6 +60,22 @@ export default function GateCard({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-1">
+                {REJECTION_CHIPS.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => toggleChip(chip)}
+                    className={`rounded-full border px-2 py-0.5 text-xs ${
+                      selectedChips.includes(chip)
+                        ? "border-orange-500 bg-orange-950 text-orange-300"
+                        : "border-slate-700 text-slate-400 hover:border-slate-500"
+                    }`}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
               <label className="flex flex-col text-xs">
                 Feedback
                 <textarea
@@ -64,9 +87,10 @@ export default function GateCard({
               <button
                 className="self-start rounded bg-red-800 px-3 py-1 text-sm hover:bg-red-700"
                 onClick={() => {
-                  onDecide("rejected", { chips: [], text: feedbackText });
+                  onDecide("rejected", { chips: selectedChips, text: feedbackText });
                   setRejecting(false);
                   setFeedbackText("");
+                  setSelectedChips([]);
                 }}
               >
                 Submit rejection
