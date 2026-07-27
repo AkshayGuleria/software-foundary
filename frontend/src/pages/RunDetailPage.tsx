@@ -74,7 +74,7 @@ export default function RunDetailPage() {
         </button>
       </div>
 
-      <Ribbon units={detail.units} />
+      <Ribbon units={detail.units} gates={detail.gates} />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-3">
