@@ -11,8 +11,9 @@ from foundry.store.store import Store
 
 
 async def _make_store_scheduler_app(tmp_path):
-    engine = make_engine(str(tmp_path / "foundry.db"))
-    await init_db(engine)
+    db_path = str(tmp_path / "foundry.db")
+    engine = make_engine(db_path)
+    await init_db(engine, db_path)
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
     scheduler = Scheduler(store)
@@ -82,7 +83,7 @@ async def demo_api_client(tmp_path):
     demo_repos = str(tmp_path / "demo" / "repos")
 
     engine = make_engine(original_db)
-    await init_db(engine)
+    await init_db(engine, original_db)
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
     scheduler = Scheduler(store)

@@ -55,13 +55,17 @@ async def build_store_and_scheduler(db_path: str) -> tuple[AsyncEngine, Store, S
     (`src/foundry/api/routes/demo.py`) so both paths recover runs identically.
     Auto-creates `db_path`'s parent directory if missing (e.g. the demo db's
     default `.foundry-demo/demo.db` won't exist on first activation).
+
+    Raises `foundry.store.db.SchemaDriftError` (uncaught here -- propagates
+    to the caller) if `db_path` already exists with a table missing columns
+    the current models declare.
     """
     parent = os.path.dirname(db_path)
     if parent:
         os.makedirs(parent, exist_ok=True)
 
     engine = make_engine(db_path)
-    await init_db(engine)
+    await init_db(engine, db_path)
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
 

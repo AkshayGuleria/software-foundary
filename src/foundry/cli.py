@@ -17,7 +17,7 @@ from foundry.packs.resolve import resolve_pack_manifest, resolve_pack_version
 from foundry.playbook.lint import PlaybookLintError, lint_plan_first
 from foundry.playbook.loader import PlaybookLoadError, load_playbook
 from foundry.playbook.materializer import materialize
-from foundry.store.db import init_db, make_engine, make_sessionmaker
+from foundry.store.db import SchemaDriftError, init_db, make_engine, make_sessionmaker
 from foundry.store.store import Store
 
 app = typer.Typer()
@@ -39,7 +39,11 @@ async def _run(
     playbook_path: str, project_path: str, db: str, driver_name: str = "fake"
 ) -> tuple[str, bool, int]:
     engine = make_engine(db)
-    await init_db(engine)
+    try:
+        await init_db(engine, db)
+    except SchemaDriftError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
 
@@ -136,7 +140,11 @@ def archive_events(db: str = "foundry.db", archive_dir: str = "./archive", older
 async def _archive_events(db: str, archive_dir: str, older_than_days: int) -> None:
     os.makedirs(archive_dir, exist_ok=True)
     engine = make_engine(db)
-    await init_db(engine)
+    try:
+        await init_db(engine, db)
+    except SchemaDriftError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
 
@@ -173,7 +181,11 @@ async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
         reset_sqlite_db(db, repos_dir)
 
     engine = make_engine(db)
-    await init_db(engine)
+    try:
+        await init_db(engine, db)
+    except SchemaDriftError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
 
@@ -183,7 +195,11 @@ async def _demo_seed(db: str, repos_dir: str, reset: bool = False) -> None:
 
 
 async def _serve(db: str, host: str, port: int) -> None:
-    engine, store, scheduler = await build_store_and_scheduler(db)
+    try:
+        engine, store, scheduler = await build_store_and_scheduler(db)
+    except SchemaDriftError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
 
     api_app = create_app(store, scheduler, engine=engine, original_db_path=db)
     config = uvicorn.Config(api_app, host=host, port=port, log_level="info")
