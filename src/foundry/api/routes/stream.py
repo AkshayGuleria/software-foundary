@@ -24,7 +24,8 @@ async def stream_run(run_id: str, request: Request) -> EventSourceResponse:
             events = await store.list_events(run_id, after_seq=seq)
             for ev in events:
                 seq = ev.seq
-                yield {"id": str(ev.seq), "event": ev.type, "data": json.dumps(ev.payload_json)}
+                envelope = {"unit_id": ev.unit_id, "payload": ev.payload_json}
+                yield {"id": str(ev.seq), "event": ev.type, "data": json.dumps(envelope)}
             await asyncio.sleep(0.2)
 
     return EventSourceResponse(event_generator())

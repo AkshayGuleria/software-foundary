@@ -45,3 +45,23 @@ async def test_stream_resumes_from_last_event_id(sse_api_client):
     text = "\n".join(lines)
     assert "event.one" not in text  # already seen, per Last-Event-ID
     assert "event.two" in text
+
+
+@pytest.mark.asyncio
+async def test_stream_includes_unit_id_in_the_event_envelope(sse_api_client):
+    client, store, _scheduler = sse_api_client
+
+    project = await store.create_project("proj3", "/tmp/proj3")
+    run = await store.create_run(project.id, "pb.toml", "unit-id envelope test")
+    await store.append_event(run.id, "01JUNIT1", "unit.closed", {"note": "done"})
+
+    lines: list[str] = []
+    async with client.stream("GET", f"/api/stream/{run.id}", headers={"Last-Event-ID": "0"}) as response:
+        async for line in response.aiter_lines():
+            lines.append(line)
+            if line == "" and any("unit.closed" in item for item in lines):
+                break
+
+    text = "\n".join(lines)
+    assert '"unit_id": "01JUNIT1"' in text
+    assert '"payload": {"note": "done"}' in text

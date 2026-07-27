@@ -36,16 +36,22 @@ describe("useEventStream", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("opens an EventSource to /api/stream/{runId} and appends received events", () => {
+  it("opens an EventSource to /api/stream/{runId} and appends received events with their unit_id", () => {
     const { result } = renderHook(() => useEventStream("01JR1"));
     expect(FakeEventSource.instances).toHaveLength(1);
     expect(FakeEventSource.instances[0].url).toBe("/api/stream/01JR1");
 
     act(() => {
-      FakeEventSource.instances[0].emit("unit.closed", JSON.stringify({ unit_id: "01JU1" }), "5");
+      FakeEventSource.instances[0].emit(
+        "unit.closed",
+        JSON.stringify({ unit_id: "01JU1", payload: { note: "done" } }),
+        "5"
+      );
     });
 
-    expect(result.current).toEqual([{ seq: 5, type: "unit.closed", payload: { unit_id: "01JU1" } }]);
+    expect(result.current).toEqual([
+      { seq: 5, type: "unit.closed", unit_id: "01JU1", payload: { note: "done" } },
+    ]);
   });
 
   it("closes the EventSource on unmount", () => {

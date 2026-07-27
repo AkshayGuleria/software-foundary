@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export interface FeedEvent {
   seq: number;
   type: string;
+  unit_id: string | null;
   payload: unknown;
 }
 
@@ -30,7 +31,11 @@ export function useEventStream(runId: string): FeedEvent[] {
     const source = new EventSource(`/api/stream/${runId}`);
 
     const handler = (type: string) => (ev: MessageEvent) => {
-      setEvents((prev) => [...prev, { seq: Number(ev.lastEventId), type, payload: JSON.parse(ev.data) }]);
+      const envelope = JSON.parse(ev.data) as { unit_id: string | null; payload: unknown };
+      setEvents((prev) => [
+        ...prev,
+        { seq: Number(ev.lastEventId), type, unit_id: envelope.unit_id, payload: envelope.payload },
+      ]);
     };
 
     for (const type of KNOWN_EVENT_TYPES) {
