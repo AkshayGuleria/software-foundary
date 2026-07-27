@@ -20,6 +20,7 @@ class SessionOut(BaseModel):
     tokens_in: int
     tokens_out: int
     started_at: str | None
+    ended_at: str | None = None
 
 
 @router.get("/sessions")

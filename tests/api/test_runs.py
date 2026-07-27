@@ -3,6 +3,7 @@ import subprocess
 import pytest
 
 from foundry.orchestrator.worktrees import _git_env
+from foundry.store.models import WorkUnit, utcnow
 
 
 def _init_git_repo(path):
@@ -399,3 +400,77 @@ async def test_create_run_explicit_token_budget_overrides_project_default(api_cl
     )
     assert run_resp.status_code == 201, run_resp.text
     assert run_resp.json()["data"]["token_budget"] == 5000
+
+
+@pytest.mark.asyncio
+async def test_get_run_sessions_returns_all_sessions_for_the_run(api_client):
+    client, store, _scheduler = api_client
+
+    project = await store.create_project("proj", "/tmp/proj")
+    run = await store.create_run(project.id, "pb.toml", "session route test")
+    session_unit = (
+        await store.create_work_units(
+            [WorkUnit(run_id=run.id, step_id="implement", type="session", status="running")]
+        )
+    )[0]
+    # SessionRow's own primary key is always set equal to its owning
+    # session-type WorkUnit's id -- see Orchestrator.dispatch()'s real
+    # create_session_row(id=session_unit.id, work_unit_id=session_unit.id, ...)
+    # call in src/foundry/orchestrator/tick.py; this test fixture matches
+    # that real convention rather than inventing its own.
+    await store.create_session_row(
+        id=session_unit.id,
+        work_unit_id=session_unit.id,
+        driver="fake",
+        status="running",
+        model="m1",
+        tokens_in=10,
+        tokens_out=20,
+    )
+
+    resp = await client.get(f"/api/runs/{run.id}/sessions")
+
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert len(body) == 1
+    assert body[0]["id"] == session_unit.id
+    assert body[0]["work_unit_id"] == session_unit.id
+    assert body[0]["step_id"] == "implement"
+    assert body[0]["run_id"] == run.id
+
+
+@pytest.mark.asyncio
+async def test_get_run_sessions_includes_closed_sessions_with_ended_at(api_client):
+    client, store, _scheduler = api_client
+
+    project = await store.create_project("proj2", "/tmp/proj2")
+    run = await store.create_run(project.id, "pb.toml", "closed session test")
+    session_unit = (
+        await store.create_work_units(
+            [WorkUnit(run_id=run.id, step_id="implement", type="session", status="closed")]
+        )
+    )[0]
+
+    await store.create_session_row(
+        id=session_unit.id,
+        work_unit_id=session_unit.id,
+        driver="fake",
+        status="closed",
+        started_at=utcnow(),
+        ended_at=utcnow(),
+    )
+
+    resp = await client.get(f"/api/runs/{run.id}/sessions")
+
+    body = resp.json()["data"]
+    assert len(body) == 1
+    assert body[0]["ended_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_get_run_sessions_404s_for_an_unknown_run(api_client):
+    client, _store, _scheduler = api_client
+
+    resp = await client.get("/api/runs/nonexistent/sessions")
+
+    assert resp.status_code == 404

@@ -87,6 +87,7 @@ export interface Session {
   tokens_in: number;
   tokens_out: number;
   started_at: string | null;
+  ended_at: string | null;
 }
 
 export interface Artifact {

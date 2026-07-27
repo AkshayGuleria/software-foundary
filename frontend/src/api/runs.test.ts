@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cancelRun, createRun, getRunArtifacts, getRunDetail, getRunGraph, listRuns } from "./runs";
+import { cancelRun, createRun, getRunArtifacts, getRunDetail, getRunGraph, getRunSessions, listRuns } from "./runs";
 
 const sampleRun = {
   id: "01JR1", project_id: "01JP1", playbook_ref: "demo.toml",
@@ -71,5 +71,18 @@ describe("runs API", () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
     await cancelRun("01JR1");
     expect(fetch).toHaveBeenCalledWith("/api/runs/01JR1/cancel", { method: "POST" });
+  });
+
+  it("getRunSessions GETs /api/runs/{id}/sessions", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({ data: [{ id: "s1", work_unit_id: "u1", run_id: "r1", step_id: "implement", driver: "fake", status: "closed", model: "m1", tokens_in: 10, tokens_out: 20, started_at: "2026-07-21T00:00:00Z", ended_at: "2026-07-21T00:05:00Z" }], paging: {} }),
+    });
+
+    const sessions = await getRunSessions("r1");
+
+    expect(fetch).toHaveBeenCalledWith("/api/runs/r1/sessions", undefined);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].ended_at).toBe("2026-07-21T00:05:00Z");
   });
 });

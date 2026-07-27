@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { Artifact, Run, RunDetail, RunGraph } from "./types";
+import type { Artifact, Run, RunDetail, RunGraph, Session } from "./types";
 
 export async function listRuns(params?: { project_id?: string; status?: string }): Promise<Run[]> {
   const query = new URLSearchParams();
@@ -41,4 +41,9 @@ export async function getRunGraph(runId: string): Promise<RunGraph> {
 
 export async function cancelRun(runId: string): Promise<void> {
   await apiFetch<null>(`/api/runs/${runId}/cancel`, { method: "POST" });
+}
+
+export async function getRunSessions(runId: string): Promise<Session[]> {
+  const res = await apiFetch<Session[]>(`/api/runs/${runId}/sessions`);
+  return res.data;
 }

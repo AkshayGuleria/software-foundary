@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from foundry.api.errors import ConflictError, NotFoundError, ValidationApiError, validate_paging
 from foundry.api.routes.projects import _get_store
+from foundry.api.routes.sessions import SessionOut
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.drivers.factory import make_driver
 from foundry.kg.service import build_kg
@@ -298,3 +299,31 @@ async def get_run_artifacts(run_id: str, request: Request, latest: int = 0) -> A
     return ApiResponse[list[ArtifactOut]](
         data=[_to_artifact_out(a) for a in artifacts], paging=Paging.unpaginated(len(artifacts))
     )
+
+
+@router.get("/runs/{run_id}/sessions")
+async def get_run_sessions(run_id: str, request: Request) -> ApiResponse[list[SessionOut]]:
+    store = _get_store(request)
+    run = await store.get_run(run_id)
+    if run is None:
+        raise NotFoundError(f"Run {run_id} not found")
+
+    units_by_id = {u.id: u for u in await store.list_units(run_id)}
+    session_rows = await store.list_sessions_for_run(run_id)
+    sessions = [
+        SessionOut(
+            id=s.id,
+            work_unit_id=s.work_unit_id,
+            run_id=run_id,
+            step_id=units_by_id[s.work_unit_id].step_id,
+            driver=s.driver,
+            status=s.status,
+            model=s.model,
+            tokens_in=s.tokens_in,
+            tokens_out=s.tokens_out,
+            started_at=s.started_at.isoformat() if s.started_at else None,
+            ended_at=s.ended_at.isoformat() if s.ended_at else None,
+        )
+        for s in session_rows
+    ]
+    return ApiResponse[list[SessionOut]](data=sessions, paging=Paging.unpaginated(len(sessions)))
