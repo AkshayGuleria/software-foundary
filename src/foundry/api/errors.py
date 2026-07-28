@@ -34,6 +34,11 @@ class ValidationApiError(FoundryApiError):
     code = "VALIDATION_ERROR"
 
 
+class SchemaDriftApiError(FoundryApiError):
+    status_code = 500
+    code = "SCHEMA_DRIFT"
+
+
 def validate_paging(offset: int, limit: int) -> None:
     if offset < 0:
         raise ValidationApiError(f"offset must be >= 0, got {offset}")

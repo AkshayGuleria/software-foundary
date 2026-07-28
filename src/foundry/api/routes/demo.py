@@ -4,9 +4,10 @@ from fastapi import APIRouter, FastAPI, Request
 from pydantic import BaseModel
 
 from foundry.api.bootstrap import build_store_and_scheduler, recover_active_runs, reset_sqlite_db
-from foundry.api.errors import ConflictError
+from foundry.api.errors import ConflictError, SchemaDriftApiError
 from foundry.api.schemas import ApiResponse, Paging
 from foundry.demo.seed import run_demo_seed
+from foundry.store.db import SchemaDriftError
 
 router = APIRouter()
 
@@ -87,9 +88,12 @@ async def demo_status(request: Request) -> ApiResponse[DemoStatusOut]:
 @router.post("/demo/activate")
 async def activate_demo(request: Request) -> ApiResponse[DemoStatusOut]:
     app = request.app
-    await _swap_database(
-        app, app.state.demo_db_path, reset=False, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
-    )
+    try:
+        await _swap_database(
+            app, app.state.demo_db_path, reset=False, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
+        )
+    except SchemaDriftError as e:
+        raise SchemaDriftApiError(str(e)) from e
     return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())
 
 
@@ -98,7 +102,10 @@ async def deactivate_demo(request: Request) -> ApiResponse[DemoStatusOut]:
     app = request.app
     if app.state.original_db_path is None:
         raise ConflictError("no original database configured for this server")
-    await _swap_database(app, app.state.original_db_path, reset=False, seed_if_empty=False)
+    try:
+        await _swap_database(app, app.state.original_db_path, reset=False, seed_if_empty=False)
+    except SchemaDriftError as e:
+        raise SchemaDriftApiError(str(e)) from e
     return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())
 
 
@@ -107,7 +114,10 @@ async def reseed_demo(request: Request) -> ApiResponse[DemoStatusOut]:
     app = request.app
     if app.state.current_db_path != app.state.demo_db_path:
         raise ConflictError("demo mode is not active")
-    await _swap_database(
-        app, app.state.demo_db_path, reset=True, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
-    )
+    try:
+        await _swap_database(
+            app, app.state.demo_db_path, reset=True, seed_if_empty=True, repos_dir=app.state.demo_repos_dir
+        )
+    except SchemaDriftError as e:
+        raise SchemaDriftApiError(str(e)) from e
     return ApiResponse[DemoStatusOut](data=_status_out(app), paging=Paging.none())

@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -7,6 +8,36 @@ from foundry.api.app import create_app
 from foundry.api.scheduler import Scheduler
 from foundry.store.db import init_db, make_engine, make_sessionmaker
 from foundry.store.store import Store
+
+
+def _write_stale_projects_table(db_path: str) -> None:
+    import os
+
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    raw_conn = sqlite3.connect(db_path)
+    # The target db may already have a (fully current-schema) `projects`
+    # table -- e.g. `original_db_path` is built via `init_db` in the
+    # `demo_api_client` fixture before either test runs. Drop it first so
+    # this unconditionally leaves the stale shape behind, whether the file
+    # is brand new (demo db, pre-activation) or already initialized
+    # (original db).
+    raw_conn.execute("DROP TABLE IF EXISTS projects")
+    raw_conn.execute(
+        """
+        CREATE TABLE projects (
+            id VARCHAR NOT NULL,
+            name VARCHAR NOT NULL,
+            path VARCHAR NOT NULL,
+            kg_status VARCHAR NOT NULL,
+            status VARCHAR NOT NULL,
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE (name)
+        )
+        """
+    )
+    raw_conn.commit()
+    raw_conn.close()
 
 
 @pytest.mark.asyncio
@@ -242,3 +273,42 @@ async def test_demo_status_does_not_500_when_original_db_path_is_none(tmp_path):
 
     await store.stop()
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_demo_activate_returns_a_clear_error_on_schema_drift(demo_api_client):
+    client, app = demo_api_client
+    _write_stale_projects_table(app.state.demo_db_path)
+
+    resp = await client.post("/api/demo/activate")
+
+    assert resp.status_code == 500
+    body = resp.json()["error"]
+    assert body["code"] == "SCHEMA_DRIFT"
+    assert "default_driver" in body["message"]
+
+    # The server must be left on its original db, not wedged on the
+    # broken demo db or on a stopped/disposed store -- the existing
+    # mid-swap-failure recovery mechanism should have rebuilt app.state
+    # back onto original_db_path.
+    assert app.state.current_db_path == app.state.original_db_path
+    projects = await app.state.store.list_projects()  # must not hang/raise
+    assert projects == []
+
+
+@pytest.mark.asyncio
+async def test_demo_deactivate_returns_a_clear_error_on_schema_drift(demo_api_client):
+    client, app = demo_api_client
+    # `_swap_database` no-ops when `current_db_path` already equals the
+    # target, and the fixture starts on `original_db_path` -- deactivate
+    # only actually attempts to re-open `original_db_path` (and so can hit
+    # its schema drift) once demo mode has been activated first.
+    await client.post("/api/demo/activate")
+    _write_stale_projects_table(app.state.original_db_path)
+
+    resp = await client.post("/api/demo/deactivate")
+
+    assert resp.status_code == 500
+    body = resp.json()["error"]
+    assert body["code"] == "SCHEMA_DRIFT"
+    assert "default_driver" in body["message"]
