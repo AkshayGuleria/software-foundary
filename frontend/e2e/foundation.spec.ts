@@ -36,3 +36,20 @@ test.describe("Foundation — Button", () => {
     expect(destructiveBg).not.toBe(defaultBg);
   });
 });
+
+test.describe("Foundation — Input/Textarea/Label", () => {
+  test("form fields render and accept input", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const section = page.getByTestId("uikit-form-fields");
+    const input = section.getByLabel("Name");
+    await input.fill("Test User");
+    await expect(input).toHaveValue("Test User");
+
+    const invalid = section.locator('[aria-invalid="true"]');
+    const [invalidBorder, validBorder] = await Promise.all([
+      invalid.evaluate((el) => getComputedStyle(el).borderColor),
+      input.evaluate((el) => getComputedStyle(el).borderColor),
+    ]);
+    expect(invalidBorder).not.toBe(validBorder);
+  });
+});
