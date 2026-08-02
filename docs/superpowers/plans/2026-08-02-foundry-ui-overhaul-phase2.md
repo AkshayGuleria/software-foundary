@@ -16,7 +16,7 @@
 - **Semantic status tokens already exist** (`frontend/src/tokens/status.css`, from Phase 1): `--status-success` (emerald, gate approved/run done), `--status-warning` (amber, needs attention), and `--status-danger` = `var(--destructive)`. Use these for closed/blocked/failed semantics — do not invent new hex or a fourth status color.
 - **New primitives follow the exact established shape**: a module-scoped `CSS` string, `useStyle(id, css)` from `frontend/src/components/ui/useStyle.ts`, a `data-slot` attribute on the root element, `data-variant`/`data-size`/etc. attributes for CSS-selector-driven variants (never conditional Tailwind class strings for variant logic). Register every new export in `frontend/src/components/ui/index.ts`.
 - **No new dependencies.** No Radix, no class-variance-authority, no new npm packages.
-- Run from `frontend/`: `npx tsc -b`, `npm run test -- run <file>` (vitest), `npx playwright test <file>` (after `npm run build` if testing production assets isn't needed — dev server is fine for these).
+- Run from `frontend/`: `npx tsc -b`, `npm run test -- <file>` (vitest), `npx playwright test <file>` (after `npm run build` if testing production assets isn't needed — dev server is fine for these).
 
 ## File Structure
 
@@ -613,7 +613,7 @@ export default function MemoryBrowser({ items }: { items: MemoryItem[] }) {
 
 - [ ] **Step 6: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/components/MemoryBrowser.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/components/MemoryBrowser.test.tsx`.
 Expected: 0 tsc errors, 3/3 tests pass.
 
 ```bash
@@ -748,7 +748,7 @@ The original used a `<label>` wrapping both the "Feedback" text and the `<textar
 
 - [ ] **Step 2: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/components/GateCard.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/components/GateCard.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -861,7 +861,7 @@ export default function Ribbon({
 
 - [ ] **Step 2: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/components/Ribbon.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/components/Ribbon.test.tsx`.
 Expected: 0 tsc errors, all 6 tests pass — specifically confirm both className-comparison tests ("colors a closed step's agent pill differently from a blocked one" and "colors an approved human pill differently from a rejected one") still pass, since they're the ones this task's design was built around.
 
 ```bash
@@ -989,7 +989,7 @@ export default function UnitDrawer({
 
 - [ ] **Step 2: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/components/UnitDrawer.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/components/UnitDrawer.test.tsx`.
 Expected: 0 tsc errors, all 4 tests pass.
 
 ```bash
@@ -1161,7 +1161,7 @@ In `frontend/src/components/KgGraphView.tsx`, change only the `className` on the
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/pages/RunDetailPage.test.tsx src/components/DagView.test.tsx src/components/KgGraphView.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/pages/RunDetailPage.test.tsx src/components/DagView.test.tsx src/components/KgGraphView.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -1393,7 +1393,7 @@ export default function ProjectsPage() {
 
 - [ ] **Step 5: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/pages/PortfolioHomePage.test.tsx src/pages/ProjectsPage.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/pages/PortfolioHomePage.test.tsx src/pages/ProjectsPage.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -1602,7 +1602,7 @@ export default function ProjectDetailPage() {
 
 - [ ] **Step 2: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/pages/ProjectDetailPage.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/pages/ProjectDetailPage.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -1871,7 +1871,7 @@ export default function QueuePage() {
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/pages/RunsHomePage.test.tsx src/components/NewRunForm.test.tsx src/pages/QueuePage.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/pages/RunsHomePage.test.tsx src/components/NewRunForm.test.tsx src/pages/QueuePage.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -2171,7 +2171,7 @@ export default function PacksPage() {
 
 - [ ] **Step 5: Verify and commit**
 
-Run: `cd frontend && npx tsc -b && npm run test -- run src/pages/KnowledgePage.test.tsx src/pages/FleetPage.test.tsx src/pages/MetricsPage.test.tsx src/pages/PacksPage.test.tsx`.
+Run: `cd frontend && npx tsc -b && npm run test -- src/pages/KnowledgePage.test.tsx src/pages/FleetPage.test.tsx src/pages/MetricsPage.test.tsx src/pages/PacksPage.test.tsx`.
 Expected: 0 tsc errors, all tests pass.
 
 ```bash
@@ -2319,7 +2319,7 @@ Run, from `frontend/`:
 
 ```bash
 npx tsc -b
-npm run test -- run
+npm run test
 npm run build
 npx playwright test
 ```
