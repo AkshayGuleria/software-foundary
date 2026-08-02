@@ -19,3 +19,20 @@ test.describe("Foundation — token layer", () => {
     expect(luminance(rgb)).toBeLessThan(60);
   });
 });
+
+test.describe("Foundation — Button", () => {
+  test("renders all variants and sizes on /dev/ui-kit", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const section = page.getByTestId("uikit-button");
+    await expect(section.getByRole("button", { name: "Default" })).toBeVisible();
+    await expect(section.getByRole("button", { name: "Disabled" })).toBeDisabled();
+
+    const destructive = section.getByRole("button", { name: "Destructive" });
+    const defaultBtn = section.getByRole("button", { name: "Default" });
+    const [destructiveBg, defaultBg] = await Promise.all([
+      destructive.evaluate((el) => getComputedStyle(el).backgroundColor),
+      defaultBtn.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ]);
+    expect(destructiveBg).not.toBe(defaultBg);
+  });
+});

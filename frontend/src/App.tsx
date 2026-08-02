@@ -10,6 +10,7 @@ import ProjectsPage from "./pages/ProjectsPage";
 import QueuePage from "./pages/QueuePage";
 import RunDetailPage from "./pages/RunDetailPage";
 import RunsHomePage from "./pages/RunsHomePage";
+import UiKit from "./pages/dev/UiKit";
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/fleet" element={<FleetPage />} />
           <Route path="/metrics" element={<MetricsPage />} />
           <Route path="/packs" element={<PacksPage />} />
+          <Route path="/dev/ui-kit" element={<UiKit />} />
         </Routes>
       </main>
     </div>
