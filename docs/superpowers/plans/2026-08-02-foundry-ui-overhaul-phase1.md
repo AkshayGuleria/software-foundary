@@ -1243,7 +1243,7 @@ export function TopBar() {
     >
       <DemoModeToggle />
       {/* ThemeToggle is intentionally NOT rendered here yet. Whole-branch
-          review found ~138 unmigrated slate-*/gray-* Tailwind classes still
+          review found ~138 unmigrated slate-* / gray-* Tailwind classes still
           hardcoded across all 8 pages + components -- switching to light
           mode today would render most of the app with near-black text on
           near-black backgrounds, since none of that markup reads the new
