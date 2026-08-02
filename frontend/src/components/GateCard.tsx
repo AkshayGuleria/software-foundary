@@ -1,6 +1,10 @@
 import { useState } from "react";
 import type { Artifact, Gate } from "../api/types";
 import ArtifactCard from "./ArtifactCard";
+import { Card } from "./ui/display/Card";
+import { Button } from "./ui/forms/Button";
+import { Textarea } from "./ui/forms/Textarea";
+import { Label } from "./ui/forms/Label";
 
 const REJECTION_CHIPS = ["missing tests", "wrong approach", "incomplete", "needs docs"];
 
@@ -22,14 +26,14 @@ export default function GateCard({
   }
 
   return (
-    <div className="rounded border border-slate-800 p-3">
+    <Card className="p-3">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium capitalize">{gate.gate_type} gate</span>
-        <span className="text-slate-500">{gate.decision}</span>
+        <span className="text-[var(--muted-foreground)]">{gate.decision}</span>
       </div>
 
       {gate.gate_type === "derived" && gate.cost_estimate && (
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-[var(--muted-foreground)]">
           Estimated: {gate.cost_estimate.estimated_writes_steps} write step(s), ~
           {gate.cost_estimate.estimated_tokens.toLocaleString()} tokens
         </p>
@@ -45,18 +49,12 @@ export default function GateCard({
         <div className="mt-3 flex flex-col gap-2">
           {!rejecting ? (
             <div className="flex gap-2">
-              <button
-                className="rounded bg-emerald-700 px-3 py-1 text-sm hover:bg-emerald-600"
-                onClick={() => onDecide("approved", undefined)}
-              >
+              <Button variant="success" size="sm" onClick={() => onDecide("approved", undefined)}>
                 Approve
-              </button>
-              <button
-                className="rounded bg-red-800 px-3 py-1 text-sm hover:bg-red-700"
-                onClick={() => setRejecting(true)}
-              >
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setRejecting(true)}>
                 Reject
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -66,26 +64,29 @@ export default function GateCard({
                     key={chip}
                     type="button"
                     onClick={() => toggleChip(chip)}
-                    className={`rounded-full border px-2 py-0.5 text-xs ${
+                    className={`rounded-[var(--radius-full)] border px-2 py-0.5 text-xs ${
                       selectedChips.includes(chip)
                         ? "border-orange-500 bg-orange-950 text-orange-300"
-                        : "border-slate-700 text-slate-400 hover:border-slate-500"
+                        : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--ring)]"
                     }`}
                   >
                     {chip}
                   </button>
                 ))}
               </div>
-              <label className="flex flex-col text-xs">
-                Feedback
-                <textarea
-                  className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="gate-feedback" className="text-xs">Feedback</Label>
+                <Textarea
+                  id="gate-feedback"
+                  className="text-sm"
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
                 />
-              </label>
-              <button
-                className="self-start rounded bg-red-800 px-3 py-1 text-sm hover:bg-red-700"
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="self-start"
                 onClick={() => {
                   onDecide("rejected", { chips: selectedChips, text: feedbackText });
                   setRejecting(false);
@@ -94,11 +95,11 @@ export default function GateCard({
                 }}
               >
                 Submit rejection
-              </button>
+              </Button>
             </div>
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
