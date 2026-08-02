@@ -1,0 +1,10 @@
+:root {
+  --status-success: oklch(0.696 0.17 162);   /* emerald — gate approved / run done */
+  --status-warning: oklch(0.769 0.188 70);   /* amber — needs attention */
+  --status-danger: var(--destructive);       /* reuse the DS's existing red */
+}
+
+html.dark {
+  --status-success: oklch(0.75 0.15 162);
+  --status-warning: oklch(0.809 0.164 70);
+}
