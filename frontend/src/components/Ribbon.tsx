@@ -1,19 +1,31 @@
 import type { Gate, WorkUnit } from "../api/types";
+import { useStyle } from "./ui/useStyle";
 
+const CSS = `
+.ribbon-tone-success{background:color-mix(in oklab, var(--status-success) 20%, transparent);color:var(--status-success)}
+.ribbon-tone-warning{background:color-mix(in oklab, var(--status-warning) 20%, transparent);color:var(--status-warning)}
+.ribbon-tone-danger{background:color-mix(in oklab, var(--destructive) 20%, transparent);color:var(--destructive)}
+.ribbon-tone-danger-strong{background:color-mix(in oklab, var(--destructive) 30%, transparent);color:var(--destructive)}
+.ribbon-tone-neutral{background:var(--secondary);color:var(--secondary-foreground)}
+`;
+
+// Brand orange (in_progress/ready) intentionally stays raw Tailwind, not a
+// ribbon-tone-* class -- see Global Constraints: orange isn't tokenized in
+// this plan, it already renders correctly in both themes.
 const STATUS_STYLES: Record<string, string> = {
-  closed: "bg-emerald-900 text-emerald-300",
-  blocked: "bg-amber-900 text-amber-300",
-  failed: "bg-red-900 text-red-300",
-  killed: "bg-red-950 text-red-400",
+  closed: "ribbon-tone-success",
+  blocked: "ribbon-tone-warning",
+  failed: "ribbon-tone-danger",
+  killed: "ribbon-tone-danger-strong",
   in_progress: "bg-orange-900 text-orange-300",
   ready: "bg-orange-950 text-orange-400",
-  open: "bg-slate-800 text-slate-400",
+  open: "ribbon-tone-neutral",
 };
 
 const GATE_STYLES: Record<string, string> = {
-  pending: "bg-slate-800 text-slate-400",
-  approved: "bg-emerald-900 text-emerald-300",
-  rejected: "bg-red-900 text-red-300",
+  pending: "ribbon-tone-neutral",
+  approved: "ribbon-tone-success",
+  rejected: "ribbon-tone-danger",
 };
 
 function styleFor(status: string): string {
@@ -33,6 +45,7 @@ export default function Ribbon({
   gates: Gate[];
   onSelectUnit?: (unit: WorkUnit) => void;
 }) {
+  useStyle("ribbon-tones", CSS);
   const steps = units
     .filter((u) => u.type !== "session")
     .slice()
@@ -49,7 +62,7 @@ export default function Ribbon({
             data-testid={`ribbon-step-${u.id}`}
             role={onSelectUnit ? "button" : undefined}
             onClick={() => onSelectUnit?.(u)}
-            className={`flex overflow-hidden rounded-full border border-slate-700 text-sm font-medium ${onSelectUnit ? "cursor-pointer" : ""}`}
+            className={`flex overflow-hidden rounded-[var(--radius-full)] border border-[var(--border)] text-sm font-medium ${onSelectUnit ? "cursor-pointer" : ""}`}
           >
             <span data-testid="ribbon-pill-agent" className={`px-3 py-1 ${styleFor(u.status)}`}>
               A · {u.step_id}
@@ -58,7 +71,7 @@ export default function Ribbon({
               <span
                 data-testid="ribbon-pill-human"
                 data-gate-type={gate.gate_type}
-                className={`border-l border-slate-700 px-3 py-1 ${gateStyleFor(gate.decision)} ${gate.gate_type === "derived" ? "italic" : ""}`}
+                className={`border-l border-[var(--border)] px-3 py-1 ${gateStyleFor(gate.decision)} ${gate.gate_type === "derived" ? "italic" : ""}`}
               >
                 H
               </span>
