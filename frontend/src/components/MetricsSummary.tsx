@@ -22,11 +22,11 @@ export default function MetricsSummary({ projectId }: { projectId: string }) {
   if (!metrics) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 p-3 sm:grid-cols-3 md:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 sm:grid-cols-3 md:grid-cols-6">
       {metricsStats(metrics).map((s) => (
         <div key={s.label} className="flex flex-col gap-1">
           <span className="text-lg font-semibold tabular-nums">{s.value}</span>
-          <span className="text-xs text-slate-500">{s.label}</span>
+          <span className="text-xs text-[var(--muted-foreground)]">{s.label}</span>
         </div>
       ))}
     </div>
