@@ -63,3 +63,12 @@ test.describe("Foundation — Select", () => {
     await expect(select).toHaveValue("paused");
   });
 });
+
+test.describe("Foundation — Table", () => {
+  test("renders header and row content", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const table = page.getByTestId("uikit-table");
+    await expect(table.getByText("rec-app")).toBeVisible();
+    await expect(table.getByText("Status")).toBeVisible();
+  });
+});

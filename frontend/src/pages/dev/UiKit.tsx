@@ -3,6 +3,9 @@ import { Input } from "../../components/ui/forms/Input";
 import { Textarea } from "../../components/ui/forms/Textarea";
 import { Label } from "../../components/ui/forms/Label";
 import { Select } from "../../components/ui/forms/Select";
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from "../../components/ui/display/Table";
 
 /**
  * Living reference for every DS-ported primitive in this app. Not linked
@@ -57,6 +60,26 @@ export default function UiKit() {
           <option value="paused">Paused</option>
           <option value="archived">Archived</option>
         </Select>
+      </section>
+
+      <section data-testid="uikit-table" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Table
+        </h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Project</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>rec-app</TableCell>
+              <TableCell>Active</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </section>
     </div>
   );
