@@ -1,6 +1,7 @@
 import type { Artifact, FeedEventLike, Gate, Session, WorkUnit } from "../api/types";
 import ArtifactCard from "./ArtifactCard";
 import GateCard from "./GateCard";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/overlay/Sheet";
 
 export default function UnitDrawer({
   unit,
@@ -35,24 +36,14 @@ export default function UnitDrawer({
   const unitSessions = sessions.filter((s) => s.work_unit_id === unit.owner_session_id);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
-      <div
-        className="flex h-full w-full max-w-lg flex-col gap-4 overflow-y-auto border-l border-slate-800 bg-slate-950 p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{unit.step_id}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded border border-slate-700 px-2 py-1 text-xs hover:border-orange-400"
-          >
-            Close
-          </button>
-        </div>
+    <Sheet open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent className="w-full max-w-lg gap-4">
+        <SheetHeader>
+          <SheetTitle>{unit.step_id}</SheetTitle>
+        </SheetHeader>
 
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gate</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Gate</h4>
           {unitGate ? (
             <GateCard
               gate={unitGate}
@@ -60,13 +51,13 @@ export default function UnitDrawer({
               onDecide={(decision, feedback) => onDecideGate(unitGate.id, decision, feedback)}
             />
           ) : (
-            <p className="text-sm text-slate-500">No gate for this step.</p>
+            <p className="text-sm text-[var(--muted-foreground)]">No gate for this step.</p>
           )}
         </section>
 
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Artifacts</h4>
-          {unitArtifacts.length === 0 && <p className="text-sm text-slate-500">No artifacts yet.</p>}
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Artifacts</h4>
+          {unitArtifacts.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No artifacts yet.</p>}
           {unitArtifacts.map((a) => (
             <div key={a.id} data-testid="drawer-artifact">
               <ArtifactCard artifact={a} />
@@ -75,13 +66,13 @@ export default function UnitDrawer({
         </section>
 
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Session log</h4>
-          {unitSessions.length === 0 && <p className="text-sm text-slate-500">No sessions yet.</p>}
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Session log</h4>
+          {unitSessions.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No sessions yet.</p>}
           {unitSessions.map((s) => (
             <div
               key={s.id}
               data-testid="drawer-session"
-              className="flex items-center justify-between rounded border border-slate-800 px-2 py-1 text-xs text-slate-400"
+              className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted-foreground)]"
             >
               <span>{s.driver} · {s.model ?? "—"}</span>
               <span>{s.status}</span>
@@ -91,15 +82,15 @@ export default function UnitDrawer({
         </section>
 
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Events</h4>
-          {unitEvents.length === 0 && <p className="text-sm text-slate-500">No events yet.</p>}
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Events</h4>
+          {unitEvents.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No events yet.</p>}
           {unitEvents.map((e) => (
-            <div key={e.seq} className="font-mono text-xs text-slate-400">
+            <div key={e.seq} className="font-mono text-xs text-[var(--muted-foreground)]">
               [{e.seq}] {e.type} {JSON.stringify(e.payload)}
             </div>
           ))}
         </section>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
