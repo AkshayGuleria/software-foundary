@@ -1,5 +1,6 @@
-import { NavLink, Route, Routes } from "react-router-dom";
-import DemoModeToggle from "./components/DemoModeToggle";
+import { Route, Routes } from "react-router-dom";
+import { Shell } from "./components/Shell";
+import { TopBar } from "./components/TopBar";
 import FleetPage from "./pages/FleetPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import MetricsPage from "./pages/MetricsPage";
@@ -14,52 +15,26 @@ import UiKit from "./pages/dev/UiKit";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="flex items-center gap-4 border-b border-slate-800 px-6 py-4">
-        <h1 className="text-lg font-semibold">Foundry</h1>
-        <nav className="flex gap-3 text-sm">
-          <NavLink to="/" end className="text-slate-400 hover:text-orange-400">
-            Portfolio
-          </NavLink>
-          <NavLink to="/queue" className="text-slate-400 hover:text-orange-400">
-            Queue
-          </NavLink>
-          <NavLink to="/projects" className="text-slate-400 hover:text-orange-400">
-            Projects
-          </NavLink>
-          <NavLink to="/runs" className="text-slate-400 hover:text-orange-400">
-            Runs
-          </NavLink>
-          <NavLink to="/knowledge" className="text-slate-400 hover:text-orange-400">
-            Knowledge
-          </NavLink>
-          <NavLink to="/fleet" className="text-slate-400 hover:text-orange-400">
-            Fleet
-          </NavLink>
-          <NavLink to="/metrics" className="text-slate-400 hover:text-orange-400">
-            Metrics
-          </NavLink>
-          <NavLink to="/packs" className="text-slate-400 hover:text-orange-400">
-            Packs
-          </NavLink>
-        </nav>
-        <DemoModeToggle />
-      </header>
-      <main className="p-6">
-        <Routes>
-          <Route path="/" element={<PortfolioHomePage />} />
-          <Route path="/queue" element={<QueuePage />} />
-          <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/projects/:id" element={<ProjectDetailPage />} />
-          <Route path="/runs" element={<RunsHomePage />} />
-          <Route path="/runs/:id" element={<RunDetailPage />} />
-          <Route path="/knowledge" element={<KnowledgePage />} />
-          <Route path="/fleet" element={<FleetPage />} />
-          <Route path="/metrics" element={<MetricsPage />} />
-          <Route path="/packs" element={<PacksPage />} />
-          <Route path="/dev/ui-kit" element={<UiKit />} />
-        </Routes>
-      </main>
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <Shell />
+      <div className="pl-60">
+        <TopBar />
+        <main className="p-6">
+          <Routes>
+            <Route path="/" element={<PortfolioHomePage />} />
+            <Route path="/queue" element={<QueuePage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/runs" element={<RunsHomePage />} />
+            <Route path="/runs/:id" element={<RunDetailPage />} />
+            <Route path="/knowledge" element={<KnowledgePage />} />
+            <Route path="/fleet" element={<FleetPage />} />
+            <Route path="/metrics" element={<MetricsPage />} />
+            <Route path="/packs" element={<PacksPage />} />
+            <Route path="/dev/ui-kit" element={<UiKit />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }

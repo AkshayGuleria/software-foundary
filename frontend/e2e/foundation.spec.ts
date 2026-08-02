@@ -72,3 +72,28 @@ test.describe("Foundation — Table", () => {
     await expect(table.getByText("Status")).toBeVisible();
   });
 });
+
+test.describe("Foundation — Shell", () => {
+  test("sidebar renders all nav links with correct active state", async ({ page }) => {
+    await page.goto("/queue");
+    const sidebar = page.locator("aside");
+    await expect(sidebar.getByRole("link", { name: "Portfolio" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Knowledge" })).toBeVisible();
+    const queueLink = sidebar.getByRole("link", { name: "Queue" });
+    const portfolioLink = sidebar.getByRole("link", { name: "Portfolio" });
+    const [queueBg, portfolioBg] = await Promise.all([
+      queueLink.evaluate((el) => getComputedStyle(el).backgroundColor),
+      portfolioLink.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ]);
+    expect(queueBg).not.toBe(portfolioBg);
+  });
+
+  test("theme toggle switches html class and persists the choice", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTitle(/Switch to light theme/i).click();
+    const htmlClass = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClass).toBe("light");
+    const stored = await page.evaluate(() => localStorage.getItem("foundry-theme"));
+    expect(stored).toBe("light");
+  });
+});
