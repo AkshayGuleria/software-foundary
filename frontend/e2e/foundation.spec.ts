@@ -87,13 +87,28 @@ test.describe("Foundation — Shell", () => {
     ]);
     expect(queueBg).not.toBe(portfolioBg);
   });
+});
 
-  test("theme toggle switches html class and persists the choice", async ({ page }) => {
-    await page.goto("/");
+test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
+  test("switches html class, persists the choice, survives reload, and light mode actually renders light", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
     await page.getByTitle(/Switch to light theme/i).click();
     const htmlClass = await page.evaluate(() => document.documentElement.className);
     expect(htmlClass).toBe("light");
     const stored = await page.evaluate(() => localStorage.getItem("foundry-theme"));
     expect(stored).toBe("light");
+
+    // Exercises index.html's bootstrap script's "light" branch -- until
+    // this reload, only the default-dark branch had ever run in a test.
+    await page.reload();
+    const htmlClassAfterReload = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClassAfterReload).toBe("light");
+
+    // Prove light mode actually paints light, not just that the class is
+    // present -- a token regression that left light mode rendering dark
+    // would pass a class-only assertion unchanged.
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const rgb = await normalizeColor(page, bg);
+    expect(luminance(rgb)).toBeGreaterThan(200);
   });
 });
