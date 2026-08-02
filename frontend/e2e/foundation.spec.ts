@@ -89,6 +89,29 @@ test.describe("Foundation — Shell", () => {
   });
 });
 
+test.describe("Foundation — Card", () => {
+  test("renders with token-driven border and background", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const card = page.getByTestId("uikit-card").locator(".ds-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Card title");
+  });
+});
+
+test.describe("Foundation — Badge", () => {
+  test("renders all variants and tones with distinct colors", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const section = page.getByTestId("uikit-badge");
+    const [defaultBg, destructiveBg, successBg, warningBg] = await Promise.all([
+      section.getByText("Default").evaluate((el) => getComputedStyle(el).backgroundColor),
+      section.getByText("Destructive").evaluate((el) => getComputedStyle(el).backgroundColor),
+      section.getByText("Success").evaluate((el) => getComputedStyle(el).backgroundColor),
+      section.getByText("Warning").evaluate((el) => getComputedStyle(el).backgroundColor),
+    ]);
+    expect(new Set([defaultBg, destructiveBg, successBg, warningBg]).size).toBe(4);
+  });
+});
+
 test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
   test("switches html class, persists the choice, survives reload, and light mode actually renders light", async ({ page }) => {
     await page.goto("/dev/ui-kit");

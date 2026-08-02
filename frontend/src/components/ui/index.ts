@@ -6,3 +6,5 @@ export { Select, type SelectProps } from "./forms/Select";
 export {
   Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell, TableCaption,
 } from "./display/Table";
+export { Card, type CardProps } from "./display/Card";
+export { Badge, type BadgeProps } from "./display/Badge";

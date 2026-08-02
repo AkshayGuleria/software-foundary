@@ -6,6 +6,8 @@ import { Select } from "../../components/ui/forms/Select";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "../../components/ui/display/Table";
+import { Card } from "../../components/ui/display/Card";
+import { Badge } from "../../components/ui/display/Badge";
 import { ThemeToggle } from "../../components/TopBar";
 
 /**
@@ -81,6 +83,30 @@ export default function UiKit() {
             </TableRow>
           </TableBody>
         </Table>
+      </section>
+
+      <section data-testid="uikit-card" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Card
+        </h2>
+        <Card className="flex max-w-sm flex-col gap-2 p-3">
+          <span className="font-medium">Card title</span>
+          <span className="text-sm text-[var(--muted-foreground)]">Card body content.</span>
+        </Card>
+      </section>
+
+      <section data-testid="uikit-badge" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Badge
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>Default</Badge>
+          <Badge variant="secondary">Secondary</Badge>
+          <Badge variant="destructive">Destructive</Badge>
+          <Badge variant="outline">Outline</Badge>
+          <Badge tone="success">Success</Badge>
+          <Badge tone="warning">Warning</Badge>
+        </div>
       </section>
 
       <section data-testid="uikit-theme-toggle" className="space-y-3">
