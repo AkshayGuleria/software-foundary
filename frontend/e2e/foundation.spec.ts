@@ -135,3 +135,17 @@ test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
     expect(luminance(rgb)).toBeGreaterThan(200);
   });
 });
+
+test.describe("Foundation — Sheet", () => {
+  test("opens on trigger click, closes on Escape", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const section = page.getByTestId("uikit-sheet");
+    await expect(section.getByText("Sheet title")).not.toBeVisible();
+
+    await section.getByRole("button", { name: "Open sheet" }).click();
+    await expect(section.getByText("Sheet title")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(section.getByText("Sheet title")).not.toBeVisible();
+  });
+});

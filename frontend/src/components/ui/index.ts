@@ -8,3 +8,6 @@ export {
 } from "./display/Table";
 export { Card, type CardProps } from "./display/Card";
 export { Badge, type BadgeProps } from "./display/Badge";
+export {
+  Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose,
+} from "./overlay/Sheet";

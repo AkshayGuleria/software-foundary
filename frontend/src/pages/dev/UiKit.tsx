@@ -8,6 +8,7 @@ import {
 } from "../../components/ui/display/Table";
 import { Card } from "../../components/ui/display/Card";
 import { Badge } from "../../components/ui/display/Badge";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../../components/ui/overlay/Sheet";
 import { ThemeToggle } from "../../components/TopBar";
 
 /**
@@ -107,6 +108,23 @@ export default function UiKit() {
           <Badge tone="success">Success</Badge>
           <Badge tone="warning">Warning</Badge>
         </div>
+      </section>
+
+      <section data-testid="uikit-sheet" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Sheet
+        </h2>
+        <Sheet>
+          <SheetTrigger className="ds-btn" data-variant="outline" data-size="default">
+            Open sheet
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Sheet title</SheetTitle>
+              <SheetDescription>Sheet description text.</SheetDescription>
+            </SheetHeader>
+          </SheetContent>
+        </Sheet>
       </section>
 
       <section data-testid="uikit-theme-toggle" className="space-y-3">
