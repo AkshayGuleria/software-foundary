@@ -6,6 +6,7 @@ import { Select } from "../../components/ui/forms/Select";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "../../components/ui/display/Table";
+import { ThemeToggle } from "../../components/TopBar";
 
 /**
  * Living reference for every DS-ported primitive in this app. Not linked
@@ -80,6 +81,13 @@ export default function UiKit() {
             </TableRow>
           </TableBody>
         </Table>
+      </section>
+
+      <section data-testid="uikit-theme-toggle" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Theme Toggle (not yet mounted in the app shell -- see TopBar.tsx)
+        </h2>
+        <ThemeToggle />
       </section>
     </div>
   );
