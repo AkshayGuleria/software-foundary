@@ -2,6 +2,7 @@ import { Button } from "../../components/ui/forms/Button";
 import { Input } from "../../components/ui/forms/Input";
 import { Textarea } from "../../components/ui/forms/Textarea";
 import { Label } from "../../components/ui/forms/Label";
+import { Select } from "../../components/ui/forms/Select";
 
 /**
  * Living reference for every DS-ported primitive in this app. Not linked
@@ -45,6 +46,17 @@ export default function UiKit() {
           </div>
           <Input aria-invalid="true" defaultValue="invalid value" />
         </div>
+      </section>
+
+      <section data-testid="uikit-select" className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Select
+        </h2>
+        <Select defaultValue="active" wrapClassName="w-56">
+          <option value="active">Active</option>
+          <option value="paused">Paused</option>
+          <option value="archived">Archived</option>
+        </Select>
       </section>
     </div>
   );

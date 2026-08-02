@@ -53,3 +53,13 @@ test.describe("Foundation — Input/Textarea/Label", () => {
     expect(invalidBorder).not.toBe(validBorder);
   });
 });
+
+test.describe("Foundation — Select", () => {
+  test("renders and changes value", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
+    const select = page.getByTestId("uikit-select").locator("select");
+    await expect(select).toHaveValue("active");
+    await select.selectOption("paused");
+    await expect(select).toHaveValue("paused");
+  });
+});
