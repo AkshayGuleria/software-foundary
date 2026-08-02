@@ -163,6 +163,7 @@ git commit -m "test: install @playwright/test, add foundation smoke spec"
 - Modify: `frontend/src/index.css` (full rewrite, currently 3 lines)
 - Modify: `frontend/index.html` (add theme-bootstrap inline script — WatchTower's overhaul discovered a first-paint flash-of-wrong-theme without this, folding the fix in from the start here)
 - Modify: `frontend/e2e/foundation.spec.ts`
+- Modify: `frontend/vitest.config.ts` (exclude `e2e/**` — see Step 6b below)
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -181,9 +182,11 @@ Both return `isBase64: true` content — decode and write to `frontend/public/fo
 
 - [ ] **Step 2: Rewrite `frontend/src/index.css`**
 
-Replace the entire file (currently just the three `@tailwind` lines):
+Replace the entire file (currently just the three `@tailwind` lines). **`@import` must be the very first statement(s) in a CSS file, before any other rule (including `@tailwind`)** — a trailing `@import` is spec-invalid and Vite silently drops it rather than erroring, which would leave `--status-success`/`--status-warning`/`--status-danger` never actually reaching the browser despite the file looking correct at a glance:
 
 ```css
+@import "./tokens/status.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -301,9 +304,9 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
-
-@import "./tokens/status.css";
 ```
+
+(`@import "./tokens/status.css";` is already at the top of the file above — do not add a second copy at the end.)
 
 - [ ] **Step 3: Create `frontend/src/tokens/status.css`**
 
@@ -413,6 +416,27 @@ test.describe("Foundation — token layer", () => {
 
 (This task only proves dark-by-default and the token plumbing — the toggle button itself doesn't exist until Task 7's `TopBar`, so a toggle-interaction test belongs there, not here.)
 
+- [ ] **Step 6b: Exclude `e2e/` from vitest's test collection**
+
+Latent since Task 1 (which never ran `npx vitest run` as part of its own verification, so this went unnoticed): vitest's default `include` glob picks up any `*.spec.ts`/`*.test.ts` file, which means it was already trying to collect `frontend/e2e/foundation.spec.ts` and crashing on Playwright's `test.describe()` (a different `test`/`describe` than vitest's own globals) — exit code 1 despite every actual vitest test passing. Fix by excluding `e2e/` from vitest's `test.exclude`.
+
+Read `frontend/vitest.config.ts`'s current content first, then add `"e2e/**"` to its `exclude` array (spread `configDefaults.exclude` first so vitest's own default excludes — `node_modules`, `dist`, etc. — are preserved, not replaced):
+
+```ts
+import { configDefaults, defineConfig } from "vitest/config";
+// ...existing imports (react plugin, etc.) stay as they are
+
+export default defineConfig({
+  // ...existing plugins/config stay as they are
+  test: {
+    // ...existing test config (environment, setupFiles, globals) stay as they are
+    exclude: [...configDefaults.exclude, "e2e/**"],
+  },
+});
+```
+
+Add the `configDefaults` import from `"vitest/config"` alongside the existing `defineConfig` import if not already present.
+
 - [ ] **Step 7: Run all checks**
 
 ```bash
@@ -426,7 +450,7 @@ Expected: no type errors, existing vitest suite fully green (unaffected — no s
 - [ ] **Step 8: Commit**
 
 ```bash
-git add public/fonts src/index.css src/tokens/status.css index.html e2e/foundation.spec.ts e2e/utils/color.ts
+git add public/fonts src/index.css src/tokens/status.css index.html e2e/foundation.spec.ts e2e/utils/color.ts vitest.config.ts
 git commit -m "feat(ui): add DS oklch token layer, .dark-class theming, FOUC-safe bootstrap"
 ```
 
