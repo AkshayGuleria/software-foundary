@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// This project has no @types/node (nothing else here runs in a Node type
+// context, and Global Constraints forbid adding new deps for this plan).
+// Declare just enough of the Node `process` global for the CI check below
+// -- this only surfaced once tsconfig.node.json started type-checking this
+// file (Fix 4 / Task 7 Step 4b).
+declare const process: { env: Record<string, string | undefined> };
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,

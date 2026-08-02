@@ -6,3 +6,7 @@ dist/
 /vite.config.d.ts
 /vitest.config.js
 /vitest.config.d.ts
+/playwright.config.js
+/playwright.config.d.ts
+playwright-report/
+test-results/
