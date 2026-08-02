@@ -51,7 +51,15 @@ function ThemeToggle() {
 
 export function TopBar() {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--background)]/95 px-6 backdrop-blur-sm">
+    // Tailwind v3 cannot apply an opacity modifier to an arbitrary var()
+    // color (bg-[var(--background)]/95 silently compiles to nothing --
+    // same class of failure as the @import bug Task 2 already hit). Use
+    // color-mix() via an inline style instead, matching the pattern the
+    // ported DS components already use throughout for hover/hover states.
+    <header
+      className="sticky top-0 z-20 flex h-14 items-center justify-end gap-3 border-b border-[var(--border)] px-6 backdrop-blur-sm"
+      style={{ backgroundColor: "color-mix(in oklab, var(--background) 95%, transparent)" }}
+    >
       <DemoModeToggle />
       <ThemeToggle />
     </header>
