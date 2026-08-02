@@ -1114,11 +1114,14 @@ git commit -m "feat(ui): port DS Table"
 - Create: `frontend/src/components/Shell.tsx`
 - Create: `frontend/src/components/TopBar.tsx`
 - Modify: `frontend/src/App.tsx` (replace the inline layout markup; route table itself unchanged)
+- Modify: `frontend/src/pages/dev/UiKit.tsx` (add a `ThemeToggle` demo section — see Step 3b)
 - Modify: `frontend/e2e/foundation.spec.ts`
+- Modify: `frontend/.gitignore` (add `playwright-report/` and `test-results/` — whole-branch review found these leak untracked into the worktree)
+- Modify: `frontend/tsconfig.json`, `frontend/tsconfig.node.json` (include `e2e/` and `playwright.config.ts` in type-checking — whole-branch review found `npx tsc -b`, the gate every prior task ran, never actually typed the e2e directory)
 
 **Interfaces:**
-- Consumes: `Button` from Task 3; `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` from Task 2.
-- Produces: `<Shell>` (sidebar nav) + `<TopBar>` (theme toggle + relocated `DemoModeToggle`) — the last piece of Foundation. `App.tsx`'s route table is untouched; only the surrounding chrome changes.
+- Consumes: `Button` from Task 3; `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` from Task 2; `normalizeColor`/`luminance` from Task 2's `e2e/utils/color.ts`.
+- Produces: `<Shell>` (sidebar nav) + `<TopBar>` (relocated `DemoModeToggle`; exports `ThemeToggle` but does not mount it — see Step 2's note) — the last piece of Foundation. `App.tsx`'s route table is untouched; only the surrounding chrome changes.
 
 - [ ] **Step 1: `frontend/src/components/Shell.tsx`**
 
@@ -1202,7 +1205,10 @@ function MoonIcon({ className }: { className?: string }) {
   );
 }
 
-function ThemeToggle() {
+// Exported (not just used internally) so /dev/ui-kit (Task 3's gallery page)
+// can render and exercise it -- see the note below on why TopBar itself
+// does not mount it yet.
+export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
@@ -1226,9 +1232,27 @@ function ThemeToggle() {
 
 export function TopBar() {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--background)]/95 px-6 backdrop-blur-sm">
+    // Tailwind v3 cannot apply an opacity modifier to an arbitrary var()
+    // color (bg-[var(--background)]/95 silently compiles to nothing --
+    // same class of failure as the @import bug Task 2 already hit). Use
+    // color-mix() via an inline style instead, matching the pattern the
+    // ported DS components already use throughout for hover/hover states.
+    <header
+      className="sticky top-0 z-20 flex h-14 items-center justify-end gap-3 border-b border-[var(--border)] px-6 backdrop-blur-sm"
+      style={{ backgroundColor: "color-mix(in oklab, var(--background) 95%, transparent)" }}
+    >
       <DemoModeToggle />
-      <ThemeToggle />
+      {/* ThemeToggle is intentionally NOT rendered here yet. Whole-branch
+          review found ~138 unmigrated slate-*/gray-* Tailwind classes still
+          hardcoded across all 8 pages + components -- switching to light
+          mode today would render most of the app with near-black text on
+          near-black backgrounds, since none of that markup reads the new
+          oklch tokens yet. The full toggle mechanism (tokens, bootstrap
+          script, this component) IS fully built and tested -- exercised via
+          /dev/ui-kit (see Task 3's gallery page) -- it's just not exposed
+          in the live app shell until a Phase 2 plan migrates enough pages
+          that light mode is actually usable. Mount `<ThemeToggle />` here
+          once that's true. */}
     </header>
   );
 }
@@ -1279,7 +1303,28 @@ export default function App() {
 
 (`pl-60` matches `Shell`'s fixed `w-60` — keeps main content clear of the fixed sidebar.)
 
+- [ ] **Step 3b: Add a `ThemeToggle` demo section to `UiKit.tsx`**
+
+`ThemeToggle` isn't mounted in the live app shell (see the comment in Step 2's `TopBar` above), so it needs a render target for Playwright to exercise it against. Add a section to `frontend/src/pages/dev/UiKit.tsx` (created in Task 3, already has sections from Tasks 3-6 — append, don't disturb them). Add the import:
+
+```tsx
+import { ThemeToggle } from "../../components/TopBar";
+```
+
+Append a new section:
+
+```tsx
+<section data-testid="uikit-theme-toggle" className="space-y-3">
+  <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+    Theme Toggle (not yet mounted in the app shell -- see TopBar.tsx)
+  </h2>
+  <ThemeToggle />
+</section>
+```
+
 - [ ] **Step 4: Append the Playwright test**
+
+The theme-toggle test targets `/dev/ui-kit` (where `ThemeToggle` actually renders per Step 3b above, not the live app shell) and, per whole-branch review, must prove light mode actually *renders* light — not just that the `html` class flips — and must exercise `index.html`'s bootstrap script's `"light"` branch via a real reload (the default-`"dark"` branch is already covered by Task 2's test; nothing exercised the other branch before this):
 
 ```ts
 test.describe("Foundation — Shell", () => {
@@ -1296,16 +1341,44 @@ test.describe("Foundation — Shell", () => {
     ]);
     expect(queueBg).not.toBe(portfolioBg);
   });
+});
 
-  test("theme toggle switches html class and persists the choice", async ({ page }) => {
-    await page.goto("/");
+test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
+  test("switches html class, persists the choice, survives reload, and light mode actually renders light", async ({ page }) => {
+    await page.goto("/dev/ui-kit");
     await page.getByTitle(/Switch to light theme/i).click();
     const htmlClass = await page.evaluate(() => document.documentElement.className);
     expect(htmlClass).toBe("light");
     const stored = await page.evaluate(() => localStorage.getItem("foundry-theme"));
     expect(stored).toBe("light");
+
+    // Exercises index.html's bootstrap script's "light" branch -- until
+    // this reload, only the default-dark branch had ever run in a test.
+    await page.reload();
+    const htmlClassAfterReload = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClassAfterReload).toBe("light");
+
+    // Prove light mode actually paints light, not just that the class is
+    // present -- a token regression that left light mode rendering dark
+    // would pass a class-only assertion unchanged.
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const rgb = await normalizeColor(page, bg);
+    expect(luminance(rgb)).toBeGreaterThan(200);
   });
 });
+```
+
+- [ ] **Step 4b: Close two verification gaps whole-branch review found**
+
+Neither of these was ever exercised by any prior task's `npx tsc -b` or `npm run test:e2e` run:
+
+1. `frontend/tsconfig.json`'s `include` is `["src"]` — `e2e/` was never type-checked (Playwright transpiles via esbuild, no type errors surfaced even if the code were wrong). Add `"e2e"` to the array.
+2. `frontend/tsconfig.node.json`'s `include` is `["vite.config.ts", "vitest.config.ts"]` — add `"playwright.config.ts"`.
+3. `frontend/.gitignore` doesn't cover Playwright's own output directories. Add two lines:
+
+```
+playwright-report/
+test-results/
 ```
 
 - [ ] **Step 5: Run all checks**
@@ -1316,14 +1389,14 @@ npx tsc -b
 npx vitest run
 npx playwright test e2e/foundation.spec.ts
 ```
-Expected: no errors, existing vitest suite fully green, `8 passed` for Playwright.
+Expected: no errors (this run now actually type-checks `e2e/` for the first time), existing vitest suite fully green, `9 passed` for Playwright (8 from before this task's additions + the reworked theme-toggle test, which replaced 1 test with 1 more thorough test, net +1 from Task 6's baseline of 6 plus this task's 2 new specs = 8, then the theme-toggle test itself doesn't add a second test — recount from the actual file if this number drifts; the important thing is zero failures, not matching this exact count).
 
-Also manually verify: `npm run dev`, visit every route in both themes (toggle via the new button), confirm no console errors and the sidebar/top-bar render correctly. `DemoModeToggle`'s own existing behavior (whatever it does) must be unaffected — it's relocated, not modified.
+Also manually verify: `npm run dev`, visit every route (dark mode only — the toggle isn't mounted in the app shell), confirm no console errors and the sidebar/top-bar render correctly, including the top bar's now-translucent background over scrolled content. Separately visit `/dev/ui-kit` and confirm the Theme Toggle section switches to light and back correctly. `DemoModeToggle`'s own existing behavior (whatever it does) must be unaffected — it's relocated, not modified.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/components/Shell.tsx src/components/TopBar.tsx src/App.tsx e2e/foundation.spec.ts
+git add src/components/Shell.tsx src/components/TopBar.tsx src/App.tsx src/pages/dev/UiKit.tsx e2e/foundation.spec.ts .gitignore tsconfig.json tsconfig.node.json
 git commit -m "feat(ui): replace top nav with DS sidebar shell + top bar, add real theme toggle"
 ```
 
@@ -1331,4 +1404,6 @@ git commit -m "feat(ui): replace top nav with DS sidebar shell + top bar, add re
 
 ## End of Phase 1
 
-At this point: tokens/theme (including a real light/dark toggle Foundry didn't have before)/shell are fully on the DS, 6 DS primitives are ported (scoped to confirmed real usage) and proven via Playwright + the `/dev/ui-kit` gallery, and the existing vitest/Testing Library suite stays green throughout since no page/component file was touched. A later Phase 2 plan migrates the 8 existing pages + 14 components onto these primitives.
+At this point: tokens/theme/shell are fully on the DS, 6 DS primitives are ported (scoped to confirmed real usage) and proven via Playwright + the `/dev/ui-kit` gallery, and the existing vitest/Testing Library suite stays green throughout since no page/component file was touched. A later Phase 2 plan migrates the 8 existing pages + 14 components onto these primitives.
+
+**The light/dark theme toggle is fully built (tokens, FOUC-safe bootstrap script, `ThemeToggle` component) but deliberately NOT mounted in the live app shell** — whole-branch review found ~138 unmigrated `slate-*`/`gray-*` Tailwind classes still hardcoded across all 8 pages, which would render as near-unreadable (near-black text on near-black backgrounds) if a user actually switched to light mode today. The toggle is exercised and tested via `/dev/ui-kit` only. Mounting `<ThemeToggle />` in `TopBar.tsx` is a one-line change Phase 2 should make once enough pages are migrated that light mode is genuinely usable — track this explicitly in Phase 2's plan rather than leaving it as an easy-to-forget loose end.
