@@ -8,6 +8,7 @@ __pycache__/
 *.db-wal
 *.db-shm
 worktrees/
+.superpowers/
 .claude/*
 !.claude/CLAUDE.md
 !.claude/git-workflow.md
