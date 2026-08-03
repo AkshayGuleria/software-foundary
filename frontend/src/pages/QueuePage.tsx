@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { batchDecideGates, completeHumanTask, getQueue } from "../api/queue";
+import { Button } from "../components/ui/forms/Button";
+import { Card } from "../components/ui/display/Card";
 
 export default function QueuePage() {
   const queryClient = useQueryClient();
@@ -28,7 +30,7 @@ export default function QueuePage() {
   };
 
   if (isLoading || !queue) {
-    return <p className="text-slate-400">Loading…</p>;
+    return <p className="text-[var(--muted-foreground)]">Loading…</p>;
   }
 
   return (
@@ -37,57 +39,55 @@ export default function QueuePage() {
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Gates</h3>
-          <button
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Gates</h3>
+          <Button
             type="button"
             disabled={selectedGateIds.length === 0 || batchApproveMutation.isPending}
             onClick={() => batchApproveMutation.mutate()}
-            className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium hover:bg-orange-500 disabled:opacity-50"
           >
             Approve selected
-          </button>
+          </Button>
         </div>
         <ul className="flex flex-col gap-2">
           {queue.gates.map((g) => (
-            <li key={g.id} className="flex items-center justify-between rounded border border-slate-800 px-3 py-2">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  aria-label={g.step_id}
-                  checked={selectedGateIds.includes(g.id)}
-                  onChange={() => toggleGate(g.id)}
-                />
-                <div>
-                  <span className="text-sm text-slate-300">
-                    {g.project_name} / <Link to={`/runs/${g.run_id}`} className="text-orange-400 hover:underline">{g.run_title}</Link>
-                  </span>
-                  <span className="ml-2 text-xs text-slate-500">{g.step_id}</span>
+            <li key={g.id}>
+              <Card className="flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    aria-label={g.step_id}
+                    checked={selectedGateIds.includes(g.id)}
+                    onChange={() => toggleGate(g.id)}
+                  />
+                  <div>
+                    <span className="text-sm text-[var(--foreground)]">
+                      {g.project_name} / <Link to={`/runs/${g.run_id}`} className="text-orange-400 hover:underline">{g.run_title}</Link>
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--muted-foreground)]">{g.step_id}</span>
+                  </div>
                 </div>
-              </div>
+              </Card>
             </li>
           ))}
         </ul>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Human tasks</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Human tasks</h3>
         <ul className="flex flex-col gap-2">
           {queue.human_tasks.map((h) => (
-            <li key={h.id} className="flex items-center justify-between rounded border border-slate-800 px-3 py-2">
-              <div>
-                <span className="text-sm text-slate-300">
-                  {h.project_name} / <Link to={`/runs/${h.run_id}`} className="text-orange-400 hover:underline">{h.run_title}</Link>
-                </span>
-                <span className="ml-2 text-xs text-slate-500">{h.reason}</span>
-              </div>
-              <button
-                type="button"
-                disabled={completeMutation.isPending}
-                onClick={() => completeMutation.mutate(h.id)}
-                className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-orange-400 hover:text-orange-400"
-              >
-                Mark resolved
-              </button>
+            <li key={h.id}>
+              <Card className="flex items-center justify-between px-3 py-2">
+                <div>
+                  <span className="text-sm text-[var(--foreground)]">
+                    {h.project_name} / <Link to={`/runs/${h.run_id}`} className="text-orange-400 hover:underline">{h.run_title}</Link>
+                  </span>
+                  <span className="ml-2 text-xs text-[var(--muted-foreground)]">{h.reason}</span>
+                </div>
+                <Button type="button" variant="outline" size="xs" disabled={completeMutation.isPending} onClick={() => completeMutation.mutate(h.id)}>
+                  Mark resolved
+                </Button>
+              </Card>
             </li>
           ))}
         </ul>

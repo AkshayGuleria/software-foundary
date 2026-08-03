@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Project } from "../api/types";
+import { Button } from "./ui/forms/Button";
+import { Input } from "./ui/forms/Input";
+import { Label } from "./ui/forms/Label";
+import { Select } from "./ui/forms/Select";
 
 export default function NewRunForm({
   projects,
@@ -39,54 +43,39 @@ export default function NewRunForm({
         setTitle("");
       }}
     >
-      <label className="flex flex-col text-sm">
-        Project
-        <select
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          required
-        >
+      <div className="flex flex-col gap-1 text-sm">
+        <Label htmlFor="new-run-project">Project</Label>
+        <Select id="new-run-project" value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
-      </label>
-      <label className="flex flex-col text-sm">
-        Driver
-        <select
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
-          value={driver}
-          onChange={(e) => setDriver(e.target.value)}
-        >
+        </Select>
+      </div>
+      <div className="flex flex-col gap-1 text-sm">
+        <Label htmlFor="new-run-driver">Driver</Label>
+        <Select id="new-run-driver" value={driver} onChange={(e) => setDriver(e.target.value)}>
           <option value="fake">fake</option>
           <option value="codex">codex</option>
           <option value="claude">claude</option>
-        </select>
-      </label>
-      <label className="flex flex-col text-sm">
-        Playbook path
-        <input
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
+        </Select>
+      </div>
+      <div className="flex flex-col gap-1 text-sm">
+        <Label htmlFor="new-run-playbook">Playbook path</Label>
+        <Input
+          id="new-run-playbook"
           value={playbookPath}
           onChange={(e) => setPlaybookPath(e.target.value)}
           placeholder="tests/orchestrator/fixtures/linear_demo.toml"
           required
         />
-      </label>
-      <label className="flex flex-col text-sm">
-        Title (optional)
-        <input
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </label>
-      <button type="submit" className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium hover:bg-orange-500">
-        Start run
-      </button>
+      </div>
+      <div className="flex flex-col gap-1 text-sm">
+        <Label htmlFor="new-run-title">Title (optional)</Label>
+        <Input id="new-run-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      </div>
+      <Button type="submit">Start run</Button>
     </form>
   );
 }

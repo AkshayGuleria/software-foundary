@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { listProjects } from "../api/projects";
 import { createRun, listRuns } from "../api/runs";
 import NewRunForm from "../components/NewRunForm";
+import { Card } from "../components/ui/display/Card";
 
 export default function RunsHomePage() {
   const [searchParams] = useSearchParams();
@@ -32,15 +33,17 @@ export default function RunsHomePage() {
         <NewRunForm projects={projects} defaultProjectId={projectId} onSubmit={(input) => createMutation.mutate(input)} />
       )}
       {isLoading ? (
-        <p className="text-slate-400">Loading…</p>
+        <p className="text-[var(--muted-foreground)]">Loading…</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {runs?.map((r) => (
-            <li key={r.id} className="flex items-center justify-between rounded border border-slate-800 px-3 py-2">
-              <Link to={`/runs/${r.id}`} className="font-medium text-orange-400 hover:underline">
-                {r.title}
-              </Link>
-              <span className="text-sm text-slate-500">{r.status}</span>
+            <li key={r.id}>
+              <Card className="flex items-center justify-between px-3 py-2">
+                <Link to={`/runs/${r.id}`} className="font-medium text-orange-400 hover:underline">
+                  {r.title}
+                </Link>
+                <span className="text-sm text-[var(--muted-foreground)]">{r.status}</span>
+              </Card>
             </li>
           ))}
         </ul>
