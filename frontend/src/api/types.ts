@@ -196,3 +196,16 @@ export interface DemoStatus {
   active: boolean;
   db_path: string;
 }
+
+export interface ProjectPlaybookSummary {
+  slug: string;
+  project_id: string;
+  playbook_id: string;
+  description: string;
+  path: string;
+  updated_at: string;
+}
+
+export interface ProjectPlaybookDetail extends ProjectPlaybookSummary {
+  content: string;
+}
