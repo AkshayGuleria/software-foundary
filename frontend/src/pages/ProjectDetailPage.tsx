@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getProject, updateProjectSettings } from "../api/projects";
+import { deleteProjectPlaybook, listProjectPlaybooks } from "../api/projectPlaybooks";
 import { getProjectMetrics } from "../api/metrics";
 import { getProjectKgGraph, listMemory } from "../api/knowledge";
 import { listRuns } from "../api/runs";
@@ -43,6 +44,11 @@ export default function ProjectDetailPage() {
     queryFn: () => listMemory({ project_id: projectId }),
     enabled: !!project,
   });
+  const { data: playbooks } = useQuery({
+    queryKey: ["project-playbooks", projectId],
+    queryFn: () => listProjectPlaybooks(projectId),
+    enabled: !!project,
+  });
 
   const queryClient = useQueryClient();
   const [driver, setDriver] = useState("fake");
@@ -57,6 +63,11 @@ export default function ProjectDetailPage() {
         playbook_path: playbookPath,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+  });
+
+  const deletePlaybookMutation = useMutation({
+    mutationFn: (slug: string) => deleteProjectPlaybook(projectId, slug),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project-playbooks", projectId] }),
   });
 
   useEffect(() => {
@@ -129,6 +140,46 @@ export default function ProjectDetailPage() {
             Save settings
           </Button>
         </form>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Playbooks</h3>
+          <Link to={`/projects/${projectId}/playbooks/new`} className="text-sm text-orange-400 hover:underline">
+            New playbook →
+          </Link>
+        </div>
+        {playbooks && playbooks.length === 0 && (
+          <p className="text-sm text-[var(--muted-foreground)]">No project-specific playbooks yet.</p>
+        )}
+        <ul className="flex flex-col gap-2">
+          {playbooks?.map((pb) => (
+            <li key={pb.slug}>
+              <Card className="flex items-center justify-between px-3 py-2">
+                <div>
+                  <Link
+                    to={`/projects/${projectId}/playbooks/${pb.slug}`}
+                    className="font-medium text-orange-400 hover:underline"
+                  >
+                    {pb.playbook_id}
+                  </Link>
+                  <span className="ml-2 text-sm text-[var(--muted-foreground)]">{pb.description}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    if (window.confirm(`Delete playbook "${pb.slug}"?`)) {
+                      deletePlaybookMutation.mutate(pb.slug);
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+              </Card>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="flex flex-col gap-3">

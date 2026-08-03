@@ -216,4 +216,54 @@ describe("ProjectDetailPage", () => {
       ),
     );
   });
+
+  it("renders the project's playbooks and deletes one on confirm", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/projects/p1") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: { id: "p1", name: "acme", path: "/tmp/acme", kg_status: "none", status: "active", created_at: "2026-07-21T00:00:00Z" },
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/projects/p1/playbooks") {
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({
+              data: [
+                {
+                  slug: "hotfix", project_id: "p1", playbook_id: "hotfix",
+                  description: "A minimal one-step playbook",
+                  path: "project_playbooks/p1/hotfix.toml", updated_at: "2026-08-03T00:00:00Z",
+                },
+              ],
+              paging: {},
+            }),
+          });
+        }
+        if (url === "/api/projects/p1/playbooks/hotfix" && init?.method === "DELETE") {
+          return Promise.resolve({ ok: true, status: 204, json: async () => ({}) });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }),
+    );
+
+    renderWithProviders("p1");
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText("hotfix")).toBeInTheDocument());
+    expect(screen.getByText(/a minimal one-step playbook/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+    expect(window.confirm).toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith("/api/projects/p1/playbooks/hotfix", { method: "DELETE" }),
+    );
+  });
 });
