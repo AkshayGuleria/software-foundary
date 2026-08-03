@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { activateProject, archiveProject, pauseProject } from "../api/projects";
-
-const buttonClassName =
-  "rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-orange-400 hover:text-orange-400";
+import { Button } from "./ui/forms/Button";
 
 export default function ProjectLifecycleButtons({
   projectId,
@@ -32,34 +30,19 @@ export default function ProjectLifecycleButtons({
   return (
     <div className="flex gap-2">
       {status !== "paused" && (
-        <button
-          type="button"
-          onClick={() => pauseMutation.mutate()}
-          disabled={pauseMutation.isPending}
-          className={buttonClassName}
-        >
+        <Button type="button" variant="outline" size="xs" onClick={() => pauseMutation.mutate()} disabled={pauseMutation.isPending}>
           Pause
-        </button>
+        </Button>
       )}
       {status !== "archived" && (
-        <button
-          type="button"
-          onClick={() => archiveMutation.mutate()}
-          disabled={archiveMutation.isPending}
-          className={buttonClassName}
-        >
+        <Button type="button" variant="outline" size="xs" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending}>
           Archive
-        </button>
+        </Button>
       )}
       {status !== "active" && (
-        <button
-          type="button"
-          onClick={() => activateMutation.mutate()}
-          disabled={activateMutation.isPending}
-          className={buttonClassName}
-        >
+        <Button type="button" variant="outline" size="xs" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
           Activate
-        </button>
+        </Button>
       )}
     </div>
   );
