@@ -2,6 +2,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { getProjectMetrics } from "../api/metrics";
 import { listProjects } from "../api/projects";
 import { metricsStats } from "../components/MetricsSummary";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/display/Table";
 
 const STAT_LABELS = [
   "Rework rate",
@@ -26,7 +27,7 @@ export default function MetricsPage() {
   });
 
   if (projectsLoading || !projects) {
-    return <p className="text-slate-400">Loading…</p>;
+    return <p className="text-[var(--muted-foreground)]">Loading…</p>;
   }
 
   const rows = projects
@@ -36,36 +37,36 @@ export default function MetricsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-xl font-semibold">Metrics</h2>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-800 text-xs uppercase text-slate-500">
-            <th className="py-2">Project</th>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Project</TableHead>
             {STAT_LABELS.map((label) => (
-              <th key={label} className="py-2">{label}</th>
+              <TableHead key={label}>{label}</TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map(({ project, query }) => (
-            <tr key={project.id} className="border-b border-slate-900">
-              <td className="py-2 font-medium">{project.name}</td>
+            <TableRow key={project.id}>
+              <TableCell className="font-medium">{project.name}</TableCell>
               {query.isError ? (
-                <td colSpan={STAT_LABELS.length} className="py-2 text-red-400">
+                <TableCell colSpan={STAT_LABELS.length} className="text-[var(--destructive)]">
                   Failed to load metrics
-                </td>
+                </TableCell>
               ) : query.data ? (
                 metricsStats(query.data).map((s) => (
-                  <td key={s.label} className="py-2 tabular-nums">{s.value}</td>
+                  <TableCell key={s.label} className="tabular-nums">{s.value}</TableCell>
                 ))
               ) : (
-                <td colSpan={STAT_LABELS.length} className="py-2 text-slate-500">
+                <TableCell colSpan={STAT_LABELS.length} className="text-[var(--muted-foreground)]">
                   Loading…
-                </td>
+                </TableCell>
               )}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

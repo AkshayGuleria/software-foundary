@@ -1,32 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { listPacks } from "../api/packs";
 import type { PackManifest } from "../api/types";
+import { Card } from "../components/ui/display/Card";
 
 function PackCard({ pack }: { pack: PackManifest }) {
   return (
-    <li className="flex flex-col gap-2 rounded border border-slate-800 px-3 py-2">
-      <div className="flex items-baseline gap-2">
-        <span className="font-medium text-orange-400">{pack.id}</span>
-        <span className="text-xs uppercase text-slate-500">{pack.version}</span>
-      </div>
-      <div>
-        <div className="text-xs uppercase text-slate-500">Roles</div>
-        <ul className="text-sm text-slate-400">
-          {pack.roles.map((role) => (
-            <li key={role.id}>
-              {role.id} <span className="text-xs text-slate-500">({role.model})</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div>
-        <div className="text-xs uppercase text-slate-500">Playbooks</div>
-        <ul className="text-sm text-slate-400">
-          {pack.playbooks.map((path) => (
-            <li key={path}>{path}</li>
-          ))}
-        </ul>
-      </div>
+    <li>
+      <Card className="flex flex-col gap-2 px-3 py-2">
+        <div className="flex items-baseline gap-2">
+          <span className="font-medium text-orange-400">{pack.id}</span>
+          <span className="text-xs uppercase text-[var(--muted-foreground)]">{pack.version}</span>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-[var(--muted-foreground)]">Roles</div>
+          <ul className="text-sm text-[var(--muted-foreground)]">
+            {pack.roles.map((role) => (
+              <li key={role.id}>
+                {role.id} <span className="text-xs text-[var(--muted-foreground)]">({role.model})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-[var(--muted-foreground)]">Playbooks</div>
+          <ul className="text-sm text-[var(--muted-foreground)]">
+            {pack.playbooks.map((path) => (
+              <li key={path}>{path}</li>
+            ))}
+          </ul>
+        </div>
+      </Card>
     </li>
   );
 }
@@ -38,7 +41,7 @@ export default function PacksPage() {
     <div className="flex flex-col gap-6">
       <h2 className="text-xl font-semibold">Packs</h2>
       {isLoading ? (
-        <p className="text-slate-400">Loading…</p>
+        <p className="text-[var(--muted-foreground)]">Loading…</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {packs?.map((pack) => (

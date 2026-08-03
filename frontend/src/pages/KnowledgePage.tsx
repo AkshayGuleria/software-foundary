@@ -5,6 +5,8 @@ import { listProjects } from "../api/projects";
 import { getProjectKgGraph, getRunBlastRadius, listMemory } from "../api/knowledge";
 import KgGraphView from "../components/KgGraphView";
 import MemoryBrowser from "../components/MemoryBrowser";
+import { Button } from "../components/ui/forms/Button";
+import { Input } from "../components/ui/forms/Input";
 
 export default function KnowledgePage() {
   const [searchParams] = useSearchParams();
@@ -33,7 +35,7 @@ export default function KnowledgePage() {
     return (
       <div className="flex flex-col gap-4">
         <h2 className="text-xl font-semibold">Knowledge</h2>
-        <p className="text-sm text-slate-400">Select a project to view its knowledge graph and memory.</p>
+        <p className="text-sm text-[var(--muted-foreground)]">Select a project to view its knowledge graph and memory.</p>
         <ul className="flex flex-col gap-2">
           {projects?.map((p) => (
             <li key={p.id}>
@@ -52,7 +54,7 @@ export default function KnowledgePage() {
       <h2 className="text-xl font-semibold">Knowledge</h2>
 
       <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Import graph</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Import graph</h3>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -60,15 +62,12 @@ export default function KnowledgePage() {
             setBlastRadiusRunId(runIdInput || undefined);
           }}
         >
-          <input
-            className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
+          <Input
             placeholder="Run ID to overlay blast radius"
             value={runIdInput}
             onChange={(e) => setRunIdInput(e.target.value)}
           />
-          <button type="submit" className="rounded bg-orange-600 px-3 py-1 text-sm hover:bg-orange-500">
-            Highlight
-          </button>
+          <Button type="submit">Highlight</Button>
         </form>
         <div className="overflow-x-auto">
           {graph && <KgGraphView nodes={graph.nodes} edges={graph.edges} highlight={blastRadius?.radius} />}
@@ -76,7 +75,7 @@ export default function KnowledgePage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Memory</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Memory</h3>
         <MemoryBrowser items={memory ?? []} />
       </div>
     </div>
