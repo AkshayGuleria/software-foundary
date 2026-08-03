@@ -77,7 +77,7 @@ export default function DagView({
       aria-label="Run DAG"
       width={Math.max(width, 200)}
       height={Math.max(height, 100)}
-      className="rounded border border-slate-800 bg-slate-950"
+      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]"
     >
       {visibleDeps.map((dep) => {
         const from = positions.get(dep.needs_unit_id);

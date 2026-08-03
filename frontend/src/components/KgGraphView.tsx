@@ -76,7 +76,7 @@ export default function KgGraphView({
       aria-label="Knowledge graph"
       width={Math.max(width, 200)}
       height={Math.max(height, 100)}
-      className="rounded border border-slate-800 bg-slate-950"
+      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]"
     >
       {visibleEdges.map((edge) => {
         // The connector must run from the dependency's (edge.to) right edge

@@ -9,6 +9,7 @@ import EventFeed from "../components/EventFeed";
 import GateCard from "../components/GateCard";
 import Ribbon from "../components/Ribbon";
 import UnitDrawer from "../components/UnitDrawer";
+import { Button } from "../components/ui/forms/Button";
 import { useEventStream } from "../hooks/useEventStream";
 
 export default function RunDetailPage() {
@@ -52,7 +53,7 @@ export default function RunDetailPage() {
   });
 
   if (isLoading || !detail) {
-    return <p className="text-slate-400">Loading…</p>;
+    return <p className="text-[var(--muted-foreground)]">Loading…</p>;
   }
 
   const isTerminal = detail.run.status === "closed" || detail.run.status === "cancelled";
@@ -63,23 +64,19 @@ export default function RunDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">{detail.run.title}</h2>
-          <p className="text-sm text-slate-500">{detail.run.status}</p>
-          <p className="text-xs text-slate-500">Pack: {detail.run.pack_version_pin}</p>
+          <p className="text-sm text-[var(--muted-foreground)]">{detail.run.status}</p>
+          <p className="text-xs text-[var(--muted-foreground)]">Pack: {detail.run.pack_version_pin}</p>
         </div>
-        <button
-          className="rounded bg-red-900 px-3 py-1.5 text-sm hover:bg-red-800 disabled:opacity-40"
-          disabled={isTerminal}
-          onClick={() => cancelMutation.mutate()}
-        >
+        <Button variant="destructive" disabled={isTerminal} onClick={() => cancelMutation.mutate()}>
           Cancel run
-        </button>
+        </Button>
       </div>
 
       <Ribbon units={detail.units} gates={detail.gates} onSelectUnit={setSelectedUnit} />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Gates & artifacts</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Gates & artifacts</h3>
           {detail.gates.map((gate) => (
             <GateCard
               key={gate.id}
@@ -88,18 +85,18 @@ export default function RunDetailPage() {
               onDecide={(decision, feedback) => decideMutation.mutate({ gateId: gate.id, decision, feedback })}
             />
           ))}
-          {detail.gates.length === 0 && <p className="text-sm text-slate-500">No gates yet.</p>}
+          {detail.gates.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No gates yet.</p>}
         </div>
 
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Live feed</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Live feed</h3>
           <EventFeed events={events} />
         </div>
       </div>
 
       {graph && (
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">DAG</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">DAG</h3>
           <div className="overflow-x-auto">
             <DagView units={graph.units} deps={graph.deps} onNodeClick={setSelectedUnit} />
           </div>
