@@ -127,7 +127,7 @@ export default function ProjectDetailPage() {
               onChange={(e) => setTokenBudget(Number(e.target.value))}
             />
           </div>
-          <div className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col gap-1 text-sm flex-1 min-w-[24rem]">
             <Label htmlFor="project-playbook-path">Default playbook path</Label>
             <Input
               id="project-playbook-path"

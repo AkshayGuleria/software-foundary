@@ -61,7 +61,7 @@ export default function NewRunForm({
           <option value="claude">claude</option>
         </Select>
       </div>
-      <div className="flex flex-col gap-1 text-sm">
+      <div className="flex flex-col gap-1 text-sm flex-1 min-w-[24rem]">
         <Label htmlFor="new-run-playbook">Playbook path</Label>
         <Input
           id="new-run-playbook"
