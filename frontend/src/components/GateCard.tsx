@@ -67,7 +67,7 @@ export default function GateCard({
                     onClick={() => toggleChip(chip)}
                     className={`rounded-[var(--radius-full)] border px-2 py-0.5 text-xs ${
                       selectedChips.includes(chip)
-                        ? "border-orange-500 text-orange-300"
+                        ? "border-orange-500 text-[#ea580c]"
                         : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--ring)]"
                     }`}
                     style={
