@@ -7,18 +7,19 @@ const CSS = `
 .ribbon-tone-danger{background:color-mix(in oklab, var(--destructive) 20%, transparent);color:var(--destructive)}
 .ribbon-tone-danger-strong{background:color-mix(in oklab, var(--destructive) 30%, transparent);color:var(--destructive)}
 .ribbon-tone-neutral{background:var(--secondary);color:var(--secondary-foreground)}
+.ribbon-tone-brand{background:color-mix(in oklab, #ea580c 20%, transparent);color:#ea580c}
 `;
 
-// Brand orange (in_progress/ready) intentionally stays raw Tailwind, not a
-// ribbon-tone-* class -- see Global Constraints: orange isn't tokenized in
-// this plan, it already renders correctly in both themes.
+// Brand orange (in_progress/ready) uses a literal hex via the color-mix
+// tint pattern above -- orange isn't tokenized in this plan, but it still
+// needs to stay theme-adaptive like the other ribbon-tone-* classes.
 const STATUS_STYLES: Record<string, string> = {
   closed: "ribbon-tone-success",
   blocked: "ribbon-tone-warning",
   failed: "ribbon-tone-danger",
   killed: "ribbon-tone-danger-strong",
-  in_progress: "bg-orange-900 text-orange-300",
-  ready: "bg-orange-950 text-orange-400",
+  in_progress: "ribbon-tone-brand",
+  ready: "ribbon-tone-brand",
   open: "ribbon-tone-neutral",
 };
 

@@ -37,7 +37,7 @@ export default function UnitDrawer({
 
   return (
     <Sheet open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="w-full max-w-lg gap-4">
+      <SheetContent>
         <SheetHeader>
           <SheetTitle>{unit.step_id}</SheetTitle>
         </SheetHeader>

@@ -29,7 +29,7 @@ export default function DemoModeToggle() {
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      <Button type="button" disabled={pending} onClick={() => (status.active ? deactivateMutation.mutate() : activateMutation.mutate())}>
+      <Button variant="brand" type="button" disabled={pending} onClick={() => (status.active ? deactivateMutation.mutate() : activateMutation.mutate())}>
         {status.active ? "Exit demo mode" : "Demo mode"}
       </Button>
       {status.active && (

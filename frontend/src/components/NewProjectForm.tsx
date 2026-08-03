@@ -25,7 +25,7 @@ export default function NewProjectForm({ onSubmit }: { onSubmit: (input: { name:
         <Label htmlFor="new-project-path">Path</Label>
         <Input id="new-project-path" value={path} onChange={(e) => setPath(e.target.value)} required />
       </div>
-      <Button type="submit">Create project</Button>
+      <Button variant="brand" type="submit">Create project</Button>
     </form>
   );
 }

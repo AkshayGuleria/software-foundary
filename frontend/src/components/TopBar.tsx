@@ -28,8 +28,7 @@ function MoonIcon({ className }: { className?: string }) {
 }
 
 // Exported (not just used internally) so /dev/ui-kit (Task 3's gallery page)
-// can render and exercise it -- see the note below on why TopBar itself
-// does not mount it yet.
+// can render and exercise it.
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 

@@ -41,6 +41,7 @@ export default function QueuePage() {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Gates</h3>
           <Button
+            variant="brand"
             type="button"
             disabled={selectedGateIds.length === 0 || batchApproveMutation.isPending}
             onClick={() => batchApproveMutation.mutate()}

@@ -125,7 +125,7 @@ export default function ProjectDetailPage() {
               placeholder="packs/default/playbooks/sdlc_story.toml"
             />
           </div>
-          <Button type="submit" disabled={settingsMutation.isPending}>
+          <Button variant="brand" type="submit" disabled={settingsMutation.isPending}>
             Save settings
           </Button>
         </form>

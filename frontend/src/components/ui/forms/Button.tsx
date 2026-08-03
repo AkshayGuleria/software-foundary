@@ -27,8 +27,8 @@ const CSS = `
 .ds-btn[data-variant="default"]:hover{background:color-mix(in oklab,var(--primary) 90%,transparent)}
 .ds-btn[data-variant="destructive"]{background:var(--destructive);color:#fff}
 .ds-btn[data-variant="destructive"]:hover{background:color-mix(in oklab,var(--destructive) 90%,transparent)}
-.ds-btn[data-variant="success"]{background:var(--status-success);color:#fff}
-.ds-btn[data-variant="success"]:hover{background:color-mix(in oklab,var(--status-success) 90%,transparent)}
+.ds-btn[data-variant="success"]{background:color-mix(in oklab, var(--status-success) 80%, black);color:#fff}
+.ds-btn[data-variant="success"]:hover{background:color-mix(in oklab, var(--status-success) 70%, black)}
 .ds-btn[data-variant="outline"]{background:var(--background);border-color:var(--border);box-shadow:var(--shadow-xs);color:var(--foreground)}
 .ds-btn[data-variant="outline"]:hover{background:var(--accent);color:var(--accent-foreground)}
 .ds-btn[data-variant="secondary"]{background:var(--secondary);color:var(--secondary-foreground)}
@@ -37,10 +37,12 @@ const CSS = `
 .ds-btn[data-variant="ghost"]:hover{background:var(--accent);color:var(--accent-foreground)}
 .ds-btn[data-variant="link"]{background:transparent;color:var(--primary);text-underline-offset:4px}
 .ds-btn[data-variant="link"]:hover{text-decoration:underline}
+.ds-btn[data-variant="brand"]{background:#ea580c;color:#fff}
+.ds-btn[data-variant="brand"]:hover{background:#f97316}
 `;
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "success";
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "success" | "brand";
   size?: "default" | "sm" | "lg" | "xs" | "icon" | "icon-sm" | "icon-lg";
 }
 

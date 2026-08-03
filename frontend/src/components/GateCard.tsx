@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Artifact, Gate } from "../api/types";
 import ArtifactCard from "./ArtifactCard";
 import { Card } from "./ui/display/Card";
@@ -17,6 +17,7 @@ export default function GateCard({
   artifact: Artifact | undefined;
   onDecide: (decision: "approved" | "rejected", feedback?: { chips: string[]; text: string }) => void;
 }) {
+  const feedbackId = useId();
   const [rejecting, setRejecting] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [selectedChips, setSelectedChips] = useState<string[]>([]);
@@ -66,18 +67,23 @@ export default function GateCard({
                     onClick={() => toggleChip(chip)}
                     className={`rounded-[var(--radius-full)] border px-2 py-0.5 text-xs ${
                       selectedChips.includes(chip)
-                        ? "border-orange-500 bg-orange-950 text-orange-300"
+                        ? "border-orange-500 text-orange-300"
                         : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--ring)]"
                     }`}
+                    style={
+                      selectedChips.includes(chip)
+                        ? { backgroundColor: "color-mix(in oklab, #ea580c 25%, transparent)" }
+                        : undefined
+                    }
                   >
                     {chip}
                   </button>
                 ))}
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="gate-feedback" className="text-xs">Feedback</Label>
+                <Label htmlFor={feedbackId} className="text-xs">Feedback</Label>
                 <Textarea
-                  id="gate-feedback"
+                  id={feedbackId}
                   className="text-sm"
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}

@@ -67,7 +67,7 @@ export default function KnowledgePage() {
             value={runIdInput}
             onChange={(e) => setRunIdInput(e.target.value)}
           />
-          <Button type="submit">Highlight</Button>
+          <Button variant="brand" type="submit">Highlight</Button>
         </form>
         <div className="overflow-x-auto">
           {graph && <KgGraphView nodes={graph.nodes} edges={graph.edges} highlight={blastRadius?.radius} />}

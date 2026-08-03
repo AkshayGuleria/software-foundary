@@ -75,7 +75,7 @@ export default function NewRunForm({
         <Label htmlFor="new-run-title">Title (optional)</Label>
         <Input id="new-run-title" value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
-      <Button type="submit">Start run</Button>
+      <Button variant="brand" type="submit">Start run</Button>
     </form>
   );
 }
