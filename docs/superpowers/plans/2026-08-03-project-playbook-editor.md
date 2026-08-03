@@ -496,6 +496,26 @@ async def test_delete_unknown_slug_returns_404(api_client):
 
 
 @pytest.mark.asyncio
+async def test_a_non_canonical_slug_returns_404_not_500_on_every_verb(api_client):
+    """project_playbook_path() (Task A) rejects any slug that isn't already
+    in canonical slugify() form -- e.g. one containing a dot-segment. FastAPI's
+    plain {slug} path converter already excludes literal '/', but a slug like
+    '..' alone is still non-canonical and must surface as a clean 404, not an
+    unhandled 500, on every verb that accepts a slug from the URL."""
+    client, _store, _scheduler = api_client
+    project_id = await _create_project(client)
+
+    get_resp = await client.get(f"/api/projects/{project_id}/playbooks/..")
+    assert get_resp.status_code == 404
+
+    put_resp = await client.put(f"/api/projects/{project_id}/playbooks/..", json={"content": VALID_TOML})
+    assert put_resp.status_code == 404
+
+    delete_resp = await client.delete(f"/api/projects/{project_id}/playbooks/..")
+    assert delete_resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_project_playbook_can_start_a_real_run(api_client):
     """End-to-end: a project playbook's returned path is a completely valid
     RunCreate.playbook_path -- proves the full-stack integration claim, not
@@ -667,7 +687,11 @@ async def create_playbook(
     root = _get_root(request)
     slug = slugify(body.name)
 
-    if os.path.exists(project_playbook_path(root, project_id, slug)):
+    try:
+        already_exists = os.path.exists(project_playbook_path(root, project_id, slug))
+    except ProjectPlaybookError as e:
+        raise ValidationApiError(str(e)) from e
+    if already_exists:
         raise ConflictError(f"Project {project_id} already has a playbook named {slug!r}")
 
     try:
@@ -686,7 +710,11 @@ async def update_playbook(
     await _require_project(request, project_id)
     root = _get_root(request)
 
-    if not os.path.exists(project_playbook_path(root, project_id, slug)):
+    try:
+        exists = os.path.exists(project_playbook_path(root, project_id, slug))
+    except ProjectPlaybookError as e:
+        raise NotFoundError(str(e)) from e
+    if not exists:
         raise NotFoundError(f"Project playbook {slug!r} not found for project {project_id}")
 
     try:
