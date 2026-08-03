@@ -83,6 +83,11 @@ def list_project_playbooks(root: str, project_id: str) -> list[ProjectPlaybookMe
         if entry.suffix != ".toml":
             continue
         try:
+            if entry.stem != slugify(entry.stem):
+                continue
+        except ProjectPlaybookError:
+            continue
+        try:
             playbook = load_playbook(str(entry))
         except _VALIDATION_ERRORS:
             continue
@@ -94,15 +99,21 @@ def read_project_playbook(root: str, project_id: str, slug: str) -> str:
     path = project_playbook_path(root, project_id, slug)
     if not os.path.exists(path):
         raise ProjectPlaybookError(f"project playbook {slug!r} not found for project {project_id!r}")
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError as e:
+        raise ProjectPlaybookError(f"project playbook {slug!r} is not valid UTF-8: {e}") from e
 
 
 def get_project_playbook_meta(root: str, project_id: str, slug: str) -> ProjectPlaybookMeta:
     path = project_playbook_path(root, project_id, slug)
     if not os.path.exists(path):
         raise ProjectPlaybookError(f"project playbook {slug!r} not found for project {project_id!r}")
-    playbook = load_playbook(path)
+    try:
+        playbook = load_playbook(path)
+    except _VALIDATION_ERRORS as e:
+        raise ProjectPlaybookError(f"project playbook {slug!r} is corrupted: {e}") from e
     return _meta_from_playbook(project_id, slug, path, playbook)
 
 

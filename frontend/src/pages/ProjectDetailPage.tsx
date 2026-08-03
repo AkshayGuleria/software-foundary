@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { ApiClientError } from "../api/client";
 import { getProject, updateProjectSettings } from "../api/projects";
 import { deleteProjectPlaybook, listProjectPlaybooks } from "../api/projectPlaybooks";
 import { getProjectMetrics } from "../api/metrics";
@@ -54,6 +55,7 @@ export default function ProjectDetailPage() {
   const [driver, setDriver] = useState("fake");
   const [tokenBudget, setTokenBudget] = useState(0);
   const [playbookPath, setPlaybookPath] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const settingsMutation = useMutation({
     mutationFn: () =>
@@ -68,6 +70,9 @@ export default function ProjectDetailPage() {
   const deletePlaybookMutation = useMutation({
     mutationFn: (slug: string) => deleteProjectPlaybook(projectId, slug),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project-playbooks", projectId] }),
+    onError: (err) => {
+      setDeleteError(err instanceof ApiClientError ? err.message : "Failed to delete playbook.");
+    },
   });
 
   useEffect(() => {
@@ -152,6 +157,14 @@ export default function ProjectDetailPage() {
         {playbooks && playbooks.length === 0 && (
           <p className="text-sm text-[var(--muted-foreground)]">No project-specific playbooks yet.</p>
         )}
+        {deleteError && (
+          <div
+            className="rounded-[var(--radius-md)] border border-[var(--destructive)] p-3 text-sm text-[var(--destructive)]"
+            style={{ backgroundColor: "color-mix(in oklab, var(--destructive) 10%, transparent)" }}
+          >
+            {deleteError}
+          </div>
+        )}
         <ul className="flex flex-col gap-2">
           {playbooks?.map((pb) => (
             <li key={pb.slug}>
@@ -164,12 +177,14 @@ export default function ProjectDetailPage() {
                     {pb.playbook_id}
                   </Link>
                   <span className="ml-2 text-sm text-[var(--muted-foreground)]">{pb.description}</span>
+                  <span className="block font-mono text-xs text-[var(--muted-foreground)]">{pb.path}</span>
                 </div>
                 <Button
                   variant="outline"
                   size="xs"
                   onClick={() => {
                     if (window.confirm(`Delete playbook "${pb.slug}"?`)) {
+                      setDeleteError(null);
                       deletePlaybookMutation.mutate(pb.slug);
                     }
                   }}

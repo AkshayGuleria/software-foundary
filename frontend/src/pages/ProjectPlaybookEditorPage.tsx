@@ -26,7 +26,7 @@ export default function ProjectPlaybookEditorPage() {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { data: existing } = useQuery({
+  const { data: existing, isError: isExistingError } = useQuery({
     queryKey: ["project-playbook", projectId, slug],
     queryFn: () => getProjectPlaybook(projectId, slug!),
     enabled: isEdit,
@@ -35,6 +35,10 @@ export default function ProjectPlaybookEditorPage() {
   useEffect(() => {
     if (existing) setContent(existing.content);
   }, [existing]);
+
+  useEffect(() => {
+    if (isExistingError) setError("Failed to load this playbook.");
+  }, [isExistingError]);
 
   const { data: packs } = useQuery({ queryKey: ["packs"], queryFn: listPacks, enabled: !isEdit });
   const templateOptions = (packs ?? []).flatMap((p) =>
