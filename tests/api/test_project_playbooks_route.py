@@ -72,6 +72,18 @@ async def test_create_with_invalid_toml_returns_400(api_client):
 
 
 @pytest.mark.asyncio
+async def test_create_with_a_name_that_normalizes_to_an_empty_slug_returns_400(api_client):
+    client, _store, _scheduler = api_client
+    project_id = await _create_project(client)
+
+    resp = await client.post(
+        f"/api/projects/{project_id}/playbooks", json={"name": "!!!", "content": VALID_TOML}
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
 async def test_create_duplicate_slug_returns_409(api_client):
     client, _store, _scheduler = api_client
     project_id = await _create_project(client)

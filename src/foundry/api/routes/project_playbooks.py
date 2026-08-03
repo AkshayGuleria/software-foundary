@@ -95,7 +95,10 @@ async def create_playbook(
 ) -> ApiResponse[ProjectPlaybookDetailOut]:
     await _require_project(request, project_id)
     root = _get_root(request)
-    slug = slugify(body.name)
+    try:
+        slug = slugify(body.name)
+    except ProjectPlaybookError as e:
+        raise ValidationApiError(str(e)) from e
 
     try:
         already_exists = os.path.exists(project_playbook_path(root, project_id, slug))
