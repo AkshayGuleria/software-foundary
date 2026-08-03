@@ -18,6 +18,7 @@ from foundry.api.routes.memory import router as memory_router
 from foundry.api.routes.metrics import router as metrics_router
 from foundry.api.routes.packs import router as packs_router
 from foundry.api.routes.portfolio import router as portfolio_router
+from foundry.api.routes.project_playbooks import router as project_playbooks_router
 from foundry.api.routes.projects import router as projects_router
 from foundry.api.routes.queue import router as queue_router
 from foundry.api.routes.runs import router as runs_router
@@ -34,6 +35,7 @@ def create_app(
     original_db_path: str | None = None,
     demo_db_path: str = ".foundry-demo/demo.db",
     demo_repos_dir: str = ".foundry-demo/repos",
+    project_playbooks_root: str = "project_playbooks",
 ) -> FastAPI:
     app = FastAPI(title="Foundry API")
     app.state.store = store
@@ -44,6 +46,7 @@ def create_app(
     app.state.demo_db_path = demo_db_path
     app.state.demo_repos_dir = demo_repos_dir
     app.state.demo_swap_lock = asyncio.Lock()
+    app.state.project_playbooks_root = project_playbooks_root
 
     app.add_exception_handler(FoundryApiError, foundry_api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
@@ -58,6 +61,7 @@ def create_app(
     app.include_router(memory_router, prefix="/api")
     app.include_router(knowledge_router, prefix="/api")
     app.include_router(packs_router, prefix="/api")
+    app.include_router(project_playbooks_router, prefix="/api")
     app.include_router(queue_router, prefix="/api")
     app.include_router(demo_router, prefix="/api")
 

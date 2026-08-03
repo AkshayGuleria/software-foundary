@@ -17,7 +17,7 @@ async def _make_store_scheduler_app(tmp_path):
     store = Store(engine, make_sessionmaker(engine))
     await store.start()
     scheduler = Scheduler(store)
-    app = create_app(store, scheduler)
+    app = create_app(store, scheduler, project_playbooks_root=str(tmp_path / "project_playbooks"))
     return engine, store, scheduler, app
 
 
