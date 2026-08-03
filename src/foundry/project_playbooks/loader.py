@@ -37,6 +37,8 @@ def project_playbook_dir(root: str, project_id: str) -> Path:
 
 
 def project_playbook_path(root: str, project_id: str, slug: str) -> str:
+    if slug != slugify(slug):
+        raise ProjectPlaybookError(f"invalid playbook slug: {slug!r}")
     return str(project_playbook_dir(root, project_id) / f"{slug}.toml")
 
 

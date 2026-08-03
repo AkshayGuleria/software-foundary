@@ -137,6 +137,13 @@ def test_list_skips_a_file_that_fails_to_parse_rather_than_erroring_the_whole_li
     assert [m.slug for m in listed] == ["hotfix"]
 
 
+def test_project_playbook_path_rejects_traversal_and_absolute_overrides(tmp_path):
+    root = str(tmp_path)
+    for malicious_slug in ["../../../../tmp/evil", "/etc/passwd", "a/b", "..", "a/../../b"]:
+        with pytest.raises(ProjectPlaybookError):
+            project_playbook_path(root, "proj-1", malicious_slug)
+
+
 def test_project_playbook_path_is_not_a_pack_regression_check(tmp_path):
     """Confirms the 'no pack.toml special-casing needed' design claim as
     code: resolve.py's parent-directory walk never finds one from inside
