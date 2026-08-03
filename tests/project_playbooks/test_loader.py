@@ -137,6 +137,24 @@ def test_list_skips_a_file_that_fails_to_parse_rather_than_erroring_the_whole_li
     assert [m.slug for m in listed] == ["hotfix"]
 
 
+def test_list_skips_a_parseable_file_with_a_non_canonical_stem(tmp_path):
+    """A file dropped in by hand (or restored from a backup) as e.g.
+    'My File.toml' parses fine -- load_playbook doesn't care about the
+    filename -- but its stem 'My File' isn't what slugify() would produce,
+    so project_playbook_path() rejects it as a slug on every other verb.
+    Listing it anyway would create a phantom entry that 404s on GET/PUT/
+    DELETE the moment a user clicks it."""
+    root = str(tmp_path)
+    write_project_playbook_atomic(root, "proj-1", "hotfix", VALID_TOML)
+    directory = project_playbook_path(root, "proj-1", "hotfix")
+    non_canonical_path = os.path.join(os.path.dirname(directory), "My File.toml")
+    with open(non_canonical_path, "w", encoding="utf-8") as f:
+        f.write(VALID_TOML)
+
+    listed = list_project_playbooks(root, "proj-1")
+    assert [m.slug for m in listed] == ["hotfix"]
+
+
 def test_project_playbook_path_rejects_traversal_and_absolute_overrides(tmp_path):
     root = str(tmp_path)
     for malicious_slug in ["../../../../tmp/evil", "/etc/passwd", "a/b", "..", "a/../../b"]:
