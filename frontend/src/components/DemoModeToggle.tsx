@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { activateDemo, deactivateDemo, getDemoStatus, reseedDemo } from "../api/demo";
+import { Button } from "./ui/forms/Button";
 
 export default function DemoModeToggle() {
   const queryClient = useQueryClient();
@@ -28,23 +29,13 @@ export default function DemoModeToggle() {
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => (status.active ? deactivateMutation.mutate() : activateMutation.mutate())}
-        className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium hover:bg-orange-500 disabled:opacity-50"
-      >
+      <Button type="button" disabled={pending} onClick={() => (status.active ? deactivateMutation.mutate() : activateMutation.mutate())}>
         {status.active ? "Exit demo mode" : "Demo mode"}
-      </button>
+      </Button>
       {status.active && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => reseedMutation.mutate()}
-          className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:border-orange-400 disabled:opacity-50"
-        >
+        <Button type="button" variant="outline" disabled={pending} onClick={() => reseedMutation.mutate()}>
           Reseed
-        </button>
+        </Button>
       )}
     </div>
   );

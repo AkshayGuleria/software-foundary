@@ -129,7 +129,7 @@ export default function UiKit() {
 
       <section data-testid="uikit-theme-toggle" className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
-          Theme Toggle (not yet mounted in the app shell -- see TopBar.tsx)
+          Theme Toggle
         </h2>
         <ThemeToggle />
       </section>

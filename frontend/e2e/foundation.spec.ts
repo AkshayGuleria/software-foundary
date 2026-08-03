@@ -115,7 +115,11 @@ test.describe("Foundation — Badge", () => {
 test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
   test("switches html class, persists the choice, survives reload, and light mode actually renders light", async ({ page }) => {
     await page.goto("/dev/ui-kit");
-    await page.getByTitle(/Switch to light theme/i).click();
+    // Scoped to the gallery section: since Task 12 mounts ThemeToggle in the
+    // (globally-rendered) TopBar too, /dev/ui-kit now legitimately contains
+    // two toggle instances -- the live TopBar one plus this page's own
+    // gallery instance -- so an unscoped getByTitle is ambiguous.
+    await page.getByTestId("uikit-theme-toggle").getByTitle(/Switch to light theme/i).click();
     const htmlClass = await page.evaluate(() => document.documentElement.className);
     expect(htmlClass).toBe("light");
     const stored = await page.evaluate(() => localStorage.getItem("foundry-theme"));
@@ -133,6 +137,34 @@ test.describe("Foundation — Theme Toggle (exercised via /dev/ui-kit)", () => {
     const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     const rgb = await normalizeColor(page, bg);
     expect(luminance(rgb)).toBeGreaterThan(200);
+  });
+});
+
+test.describe("Foundation — Theme Toggle (mounted in TopBar)", () => {
+  test("is visible in the app shell and switches theme app-wide", async ({ page }) => {
+    await page.goto("/queue");
+    const toggle = page.getByRole("banner").getByTitle(/Switch to light theme/i);
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+
+    const htmlClass = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClass).toBe("light");
+
+    const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const rgb = await normalizeColor(page, bodyBg);
+    expect(luminance(rgb)).toBeGreaterThan(200);
+
+    // Sidebar nav and the queue page's own content must also render light,
+    // not just <body> -- this is the whole point of deferring the mount to
+    // the last task: a page still holding a hardcoded slate-* background
+    // would stay dark here even though <body> switched.
+    const sidebarBg = await page.evaluate(() => {
+      const aside = document.querySelector("aside");
+      return aside ? getComputedStyle(aside).backgroundColor : null;
+    });
+    expect(sidebarBg).not.toBeNull();
+    const sidebarRgb = await normalizeColor(page, sidebarBg!);
+    expect(luminance(sidebarRgb)).toBeGreaterThan(150);
   });
 });
 

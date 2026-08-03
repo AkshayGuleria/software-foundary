@@ -64,17 +64,7 @@ export function TopBar() {
       style={{ backgroundColor: "color-mix(in oklab, var(--background) 95%, transparent)" }}
     >
       <DemoModeToggle />
-      {/* ThemeToggle is intentionally NOT rendered here yet. Whole-branch
-          review found ~138 unmigrated slate-* / gray-* Tailwind classes still
-          hardcoded across all 8 pages + components -- switching to light
-          mode today would render most of the app with near-black text on
-          near-black backgrounds, since none of that markup reads the new
-          oklch tokens yet. The full toggle mechanism (tokens, bootstrap
-          script, this component) IS fully built and tested -- exercised via
-          /dev/ui-kit (see Task 3's gallery page) -- it's just not exposed
-          in the live app shell until a Phase 2 plan migrates enough pages
-          that light mode is actually usable. Mount `<ThemeToggle />` here
-          once that's true. */}
+      <ThemeToggle />
     </header>
   );
 }
