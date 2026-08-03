@@ -111,7 +111,8 @@ export default function ProjectPlaybookEditorPage() {
         <Label htmlFor="playbook-content">Playbook TOML</Label>
         <Textarea
           id="playbook-content"
-          className="min-h-[70vh] font-mono text-xs"
+          className="font-mono text-xs"
+          style={{ minHeight: "70vh" }}
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
