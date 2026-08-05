@@ -3,6 +3,7 @@ import type { Project } from "../api/types";
 import { Button } from "./ui/forms/Button";
 import { Input } from "./ui/forms/Input";
 import { Label } from "./ui/forms/Label";
+import PlaybookPicker from "./PlaybookPicker";
 import { Select } from "./ui/forms/Select";
 
 export default function NewRunForm({
@@ -63,11 +64,11 @@ export default function NewRunForm({
       </div>
       <div className="flex flex-col gap-1 text-sm flex-1 min-w-[24rem]">
         <Label htmlFor="new-run-playbook">Playbook path</Label>
-        <Input
+        <PlaybookPicker
           id="new-run-playbook"
+          projectId={projectId}
           value={playbookPath}
-          onChange={(e) => setPlaybookPath(e.target.value)}
-          placeholder="tests/orchestrator/fixtures/linear_demo.toml"
+          onChange={setPlaybookPath}
           required
         />
       </div>
