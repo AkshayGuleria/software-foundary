@@ -46,3 +46,15 @@ async def test_schema_help_reflects_real_required_and_default_values(api_client)
     writes_field = by_key[("StepSpec", "writes")]
     assert writes_field["required"] is False
     assert writes_field["default"] == "False"
+
+
+@pytest.mark.asyncio
+async def test_schema_help_resolves_default_factory_fields(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.get("/api/playbooks/schema-help")
+    body = resp.json()["data"]
+    by_key = {(e["model"], e["field"]): e for e in body}
+
+    needs_field = by_key[("StepSpec", "needs")]
+    assert needs_field["required"] is False
+    assert needs_field["default"] == "[]"

@@ -31,12 +31,18 @@ def _field_docs(
     docs = []
     for name, field_info in model.model_fields.items():
         required = field_info.is_required()
+        if required:
+            default = None
+        elif field_info.default_factory is not None:
+            default = repr(field_info.default_factory())
+        else:
+            default = repr(field_info.default)
         docs.append(
             SchemaFieldDoc(
                 model=model_name,
                 field=name,
                 type=_format_type(field_info),
-                default=None if required else repr(field_info.default),
+                default=default,
                 required=required,
                 description=field_info.description or "",
             )
