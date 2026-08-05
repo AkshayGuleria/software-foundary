@@ -17,6 +17,7 @@ from foundry.api.routes.knowledge import router as knowledge_router
 from foundry.api.routes.memory import router as memory_router
 from foundry.api.routes.metrics import router as metrics_router
 from foundry.api.routes.packs import router as packs_router
+from foundry.api.routes.playbook_schema import router as playbook_schema_router
 from foundry.api.routes.portfolio import router as portfolio_router
 from foundry.api.routes.project_playbooks import router as project_playbooks_router
 from foundry.api.routes.projects import router as projects_router
@@ -61,6 +62,7 @@ def create_app(
     app.include_router(memory_router, prefix="/api")
     app.include_router(knowledge_router, prefix="/api")
     app.include_router(packs_router, prefix="/api")
+    app.include_router(playbook_schema_router, prefix="/api")
     app.include_router(project_playbooks_router, prefix="/api")
     app.include_router(queue_router, prefix="/api")
     app.include_router(demo_router, prefix="/api")
