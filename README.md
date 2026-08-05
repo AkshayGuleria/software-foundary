@@ -258,3 +258,26 @@ gives you the full event trace to confirm each step fired in the order you
 expect. `tests/orchestrator/fixtures/` and `tests/playbook/fixtures/` have
 several playbook fixtures used by this repo's own test suite if you want a
 reference for exercising fan-out, loops, or escalation in isolation.
+
+### Alternative: edit playbooks from the dashboard, per project
+
+You don't have to hand-author a `.toml` file and register it in `pack.toml`
+to try a playbook out — each project also has its own writable library of
+playbook copies, separate from the shared `packs/` tree, editable straight
+from the UI:
+
+- On a project's detail page, the **Playbooks** section lists that
+  project's own copies and links to **New** (blank editor) or an existing
+  slug's **Edit** page (`/projects/:id/playbooks/new` and
+  `/projects/:id/playbooks/:slug`), each a raw-TOML textarea.
+- Instead of starting blank, "start from a pack template" lets you preview
+  an existing pack playbook's content read-only, then clone it into the
+  project's library as a starting point.
+- Save runs the same validation a real run does — `load_playbook` +
+  `lint_plan_first`, server-side, on every write — so a playbook that fails
+  the schema or the plan-first invariant is rejected with an error instead
+  of being written; a bad edit can never corrupt the last-good copy on disk.
+
+Saved copies land at `project_playbooks/<project_id>/<slug>.toml` and are
+run-ready paths just like anything under `packs/` — point a run at one the
+same way you would any other playbook path.
