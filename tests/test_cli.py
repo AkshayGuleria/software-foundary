@@ -153,6 +153,19 @@ def test_run_accepts_requirement_text(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.output
+    run_id = result.output.strip()
+
+    # Verify that requirement_text actually persisted to the Run row
+    async def _verify_persistence(db_path: str) -> str | None:
+        engine = make_engine(db_path)
+        store = Store(engine, make_sessionmaker(engine))
+        await store.start()
+        run = await store.get_run(run_id)
+        await store.stop()
+        return run.requirement_text if run else None
+
+    persisted_text = asyncio.run(_verify_persistence(db_path))
+    assert persisted_text == "Add a login page."
 
 
 def test_run_rejects_both_requirement_text_and_requirement_path(tmp_path):
