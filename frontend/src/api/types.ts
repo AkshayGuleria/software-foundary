@@ -209,3 +209,14 @@ export interface ProjectPlaybookSummary {
 export interface ProjectPlaybookDetail extends ProjectPlaybookSummary {
   content: string;
 }
+
+export type SchemaFieldModel = "PlaybookSpec" | "StepSpec" | "LoopSpec";
+
+export interface SchemaFieldDoc {
+  model: SchemaFieldModel;
+  field: string;
+  type: string;
+  default: string | null;
+  required: boolean;
+  description: string;
+}

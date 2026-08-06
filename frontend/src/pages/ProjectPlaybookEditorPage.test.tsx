@@ -19,6 +19,8 @@ function renderPage(initialPath: string) {
   );
 }
 
+const EMPTY_SCHEMA_HELP = { ok: true, status: 200, json: async () => ({ data: [], paging: {} }) };
+
 describe("ProjectPlaybookEditorPage", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -39,6 +41,9 @@ describe("ProjectPlaybookEditorPage", () => {
           json: async () => ({ data: { content: "[playbook]\nid = \"bugfix\"" }, paging: {} }),
         });
       }
+      if (url === "/api/playbooks/schema-help") {
+        return Promise.resolve(EMPTY_SCHEMA_HELP);
+      }
       throw new Error(`unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
@@ -58,6 +63,9 @@ describe("ProjectPlaybookEditorPage", () => {
     const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/packs") {
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+      }
+      if (url === "/api/playbooks/schema-help") {
+        return Promise.resolve(EMPTY_SCHEMA_HELP);
       }
       if (url === "/api/projects/proj-1/playbooks" && init?.method === "POST") {
         return Promise.resolve({
@@ -95,6 +103,9 @@ describe("ProjectPlaybookEditorPage", () => {
           }),
         });
       }
+      if (url === "/api/playbooks/schema-help") {
+        return Promise.resolve(EMPTY_SCHEMA_HELP);
+      }
       throw new Error(`unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
@@ -105,5 +116,33 @@ describe("ProjectPlaybookEditorPage", () => {
       expect(screen.getByLabelText(/playbook toml/i)).toHaveValue("[playbook]\nid = \"hotfix\""),
     );
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the field reference panel grouped by model, from the schema-help endpoint", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/playbooks/schema-help") {
+        return Promise.resolve({
+          ok: true, status: 200,
+          json: async () => ({
+            data: [
+              { model: "PlaybookSpec", field: "id", type: "str", default: null, required: true, description: "Unique id for this playbook." },
+              { model: "StepSpec", field: "writes", type: "bool", default: "False", required: false, description: "Whether this step writes to the project's codebase." },
+              { model: "LoopSpec", field: "max_rounds", type: "int", default: "5", required: false, description: "Hard cap on loop re-runs." },
+            ],
+            paging: {},
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], paging: {} }) });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    renderPage("/projects/proj-1/playbooks/new");
+
+    await waitFor(() => expect(screen.getByText("writes")).toBeInTheDocument());
+    expect(screen.getByText("Playbook fields")).toBeInTheDocument();
+    expect(screen.getByText("Step fields")).toBeInTheDocument();
+    expect(screen.getByText("Loop fields")).toBeInTheDocument();
+    expect(screen.getByText(/whether this step writes to the project's codebase/i)).toBeInTheDocument();
   });
 });

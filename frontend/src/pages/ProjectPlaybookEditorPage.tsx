@@ -3,17 +3,63 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiClientError } from "../api/client";
 import { listPacks } from "../api/packs";
+import { getPlaybookSchemaHelp } from "../api/playbookSchema";
 import {
   createProjectPlaybook,
   getPackPlaybookContent,
   getProjectPlaybook,
   updateProjectPlaybook,
 } from "../api/projectPlaybooks";
+import type { SchemaFieldDoc } from "../api/types";
+import { Card } from "../components/ui/display/Card";
 import { Button } from "../components/ui/forms/Button";
 import { Input } from "../components/ui/forms/Input";
 import { Label } from "../components/ui/forms/Label";
 import { Select } from "../components/ui/forms/Select";
 import { Textarea } from "../components/ui/forms/Textarea";
+
+const FIELD_GROUPS: { model: SchemaFieldDoc["model"]; label: string }[] = [
+  { model: "PlaybookSpec", label: "Playbook fields" },
+  { model: "StepSpec", label: "Step fields" },
+  { model: "LoopSpec", label: "Loop fields" },
+];
+
+function PlaybookFieldReference() {
+  const { data: fields } = useQuery({
+    queryKey: ["playbook-schema-help"],
+    queryFn: getPlaybookSchemaHelp,
+    staleTime: Infinity,
+  });
+
+  return (
+    <details open className="w-full max-w-sm shrink-0">
+      <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+        Playbook field reference
+      </summary>
+      <Card className="mt-2 flex flex-col gap-4 p-3 text-sm">
+        {FIELD_GROUPS.map((group) => (
+          <div key={group.model} className="flex flex-col gap-2">
+            <h4 className="font-semibold">{group.label}</h4>
+            {(fields ?? [])
+              .filter((f) => f.model === group.model)
+              .map((f) => (
+                <div key={`${f.model}.${f.field}`} className="flex flex-col gap-0.5">
+                  <div className="flex items-baseline gap-2 font-mono text-xs">
+                    <span className="font-semibold">{f.field}</span>
+                    <span className="text-[var(--muted-foreground)]">{f.type}</span>
+                    <span className="text-[var(--muted-foreground)]">
+                      {f.required ? "required" : `default: ${f.default}`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)]">{f.description}</p>
+                </div>
+              ))}
+          </div>
+        ))}
+      </Card>
+    </details>
+  );
+}
 
 export default function ProjectPlaybookEditorPage() {
   const { id, slug } = useParams<{ id: string; slug?: string }>();
@@ -80,6 +126,9 @@ export default function ProjectPlaybookEditorPage() {
         </div>
       )}
 
+      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-1 min-w-[20rem] flex-col gap-4">
+
       {!isEdit && (
         <>
           <div className="flex flex-col gap-1 text-sm">
@@ -132,6 +181,10 @@ export default function ProjectPlaybookEditorPage() {
         <Button variant="outline" onClick={() => navigate(`/projects/${projectId}`)}>
           Cancel
         </Button>
+      </div>
+
+      </div>
+      <PlaybookFieldReference />
       </div>
     </div>
   );
