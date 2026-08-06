@@ -24,8 +24,17 @@ app = typer.Typer()
 
 
 @app.command()
-def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db", driver: str = "fake") -> None:
-    run_id, complete, pending_count = asyncio.run(_run(playbook_path, project_path, db, driver))
+def run(
+    playbook_path: str,
+    project_path: str = ".",
+    db: str = "foundry.db",
+    driver: str = "fake",
+    requirement_text: str | None = typer.Option(None, "--requirement-text"),
+    requirement_path: str | None = typer.Option(None, "--requirement-path"),
+) -> None:
+    run_id, complete, pending_count = asyncio.run(
+        _run(playbook_path, project_path, db, driver, requirement_text, requirement_path)
+    )
     if not complete:
         typer.echo(
             f"run {run_id} did not complete: {pending_count} unit(s) still pending (check gates/human_tasks)",
@@ -36,8 +45,17 @@ def run(playbook_path: str, project_path: str = ".", db: str = "foundry.db", dri
 
 
 async def _run(
-    playbook_path: str, project_path: str, db: str, driver_name: str = "fake"
+    playbook_path: str,
+    project_path: str,
+    db: str,
+    driver_name: str = "fake",
+    requirement_text: str | None = None,
+    requirement_path: str | None = None,
 ) -> tuple[str, bool, int]:
+    if requirement_text and requirement_path:
+        typer.echo("requirement_text and requirement_path are mutually exclusive", err=True)
+        raise typer.Exit(1)
+
     engine = make_engine(db)
     try:
         await init_db(engine, db)
@@ -63,6 +81,8 @@ async def _run(
         playbook.description or playbook.id,
         pack_version_pin=pack_version_pin,
         driver=driver_name,
+        requirement_text=requirement_text,
+        requirement_path=requirement_path,
     )
     await materialize(playbook, run_row.id, store)
 

@@ -139,6 +139,41 @@ async def _count_projects_and_runs(db_path: str) -> tuple[int, int]:
     return len(projects), len(runs)
 
 
+def test_run_accepts_requirement_text(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "tests/fixtures/cli_demo.toml",
+            "--db",
+            db_path,
+            "--requirement-text",
+            "Add a login page.",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_run_rejects_both_requirement_text_and_requirement_path(tmp_path):
+    db_path = str(tmp_path / "foundry.db")
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "tests/fixtures/cli_demo.toml",
+            "--db",
+            db_path,
+            "--requirement-text",
+            "Add a login page.",
+            "--requirement-path",
+            "docs/REQUIREMENTS.md",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "mutually exclusive" in result.output
+
+
 def test_demo_seed_reset_flag_reseeds_idempotently_instead_of_doubling_rows(tmp_path):
     db_path = str(tmp_path / "demo.db")
     repos_dir = str(tmp_path / "demo-repos")
