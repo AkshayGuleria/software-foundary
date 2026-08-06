@@ -9,6 +9,7 @@ import { getProjectKgGraph, listMemory } from "../api/knowledge";
 import { listRuns } from "../api/runs";
 import { metricsStats } from "../components/MetricsSummary";
 import ProjectLifecycleButtons from "../components/ProjectLifecycleButtons";
+import PlaybookPicker from "../components/PlaybookPicker";
 import KgGraphView from "../components/KgGraphView";
 import MemoryBrowser from "../components/MemoryBrowser";
 import { Card } from "../components/ui/display/Card";
@@ -134,11 +135,11 @@ export default function ProjectDetailPage() {
           </div>
           <div className="flex flex-col gap-1 text-sm flex-1 min-w-[24rem]">
             <Label htmlFor="project-playbook-path">Default playbook path</Label>
-            <Input
+            <PlaybookPicker
               id="project-playbook-path"
+              projectId={projectId}
               value={playbookPath}
-              onChange={(e) => setPlaybookPath(e.target.value)}
-              placeholder="packs/default/playbooks/sdlc_story.toml"
+              onChange={setPlaybookPath}
             />
           </div>
           <Button variant="brand" type="submit" disabled={settingsMutation.isPending}>

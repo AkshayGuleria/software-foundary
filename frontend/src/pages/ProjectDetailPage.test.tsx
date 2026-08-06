@@ -256,7 +256,7 @@ describe("ProjectDetailPage", () => {
     renderWithProviders("p1");
     const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByText("hotfix")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("link", { name: /hotfix/i })).toHaveAttribute("href", "/projects/p1/playbooks/hotfix"));
     expect(screen.getByText(/a minimal one-step playbook/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /delete/i }));
