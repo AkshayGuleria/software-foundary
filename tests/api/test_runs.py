@@ -474,3 +474,46 @@ async def test_get_run_sessions_404s_for_an_unknown_run(api_client):
     resp = await client.get("/api/runs/nonexistent/sessions")
 
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_run_with_both_requirement_fields_returns_400(api_client):
+    client, _store, _scheduler = api_client
+
+    proj_resp = await client.post("/api/projects", json={"name": "proj", "path": "/tmp/proj"})
+    project_id = proj_resp.json()["data"]["id"]
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project_id,
+            "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml",
+            "requirement_text": "Fix the bug.",
+            "requirement_path": "docs/REQUIREMENTS.md",
+        },
+    )
+    assert run_resp.status_code == 400, run_resp.text
+    assert run_resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_create_run_persists_requirement_text_on_the_run_row(api_client):
+    client, store, _scheduler = api_client
+
+    proj_resp = await client.post("/api/projects", json={"name": "proj", "path": "/tmp/proj"})
+    project_id = proj_resp.json()["data"]["id"]
+
+    run_resp = await client.post(
+        "/api/runs",
+        json={
+            "project_id": project_id,
+            "playbook_path": "tests/orchestrator/fixtures/linear_demo.toml",
+            "requirement_text": "Add a login page.",
+        },
+    )
+    assert run_resp.status_code == 201, run_resp.text
+    run_id = run_resp.json()["data"]["id"]
+
+    run_row = await store.get_run(run_id)
+    assert run_row.requirement_text == "Add a login page."
+    assert run_row.requirement_path is None

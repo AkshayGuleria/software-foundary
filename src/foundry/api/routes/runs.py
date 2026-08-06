@@ -34,6 +34,8 @@ class RunCreate(BaseModel):
     gate_overrides: dict[str, Literal["approved", "rejected"]] | None = None
     driver: Literal["fake", "codex", "claude"] = "fake"
     token_budget: int | None = None
+    requirement_text: str | None = None
+    requirement_path: str | None = None
 
 
 class RunOut(BaseModel):
@@ -144,6 +146,9 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
     if project.status != "active":
         raise ConflictError(f"Project {body.project_id} is not active (status: {project.status})")
 
+    if body.requirement_text and body.requirement_path:
+        raise ValidationApiError("requirement_text and requirement_path are mutually exclusive")
+
     try:
         playbook = load_playbook(body.playbook_path)
         lint_plan_first(playbook)
@@ -162,6 +167,8 @@ async def create_run(body: RunCreate, request: Request) -> ApiResponse[RunOut]:
         pack_version_pin=pack_version_pin,
         driver=body.driver,
         token_budget=effective_token_budget,
+        requirement_text=body.requirement_text,
+        requirement_path=body.requirement_path,
     )
     await materialize(playbook, run.id, store)
     if body.gate_overrides:
