@@ -70,6 +70,8 @@ class Run(Base):
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     closed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     gate_overrides_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    requirement_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    requirement_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class WorkUnit(Base):

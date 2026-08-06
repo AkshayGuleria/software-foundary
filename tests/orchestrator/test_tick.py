@@ -475,3 +475,28 @@ async def test_dispatch_sends_a_real_rendered_prompt_not_a_stub(tmp_path):
     assert not any(s.prompt.startswith("step:") and "files:" in s.prompt for s in driver.captured_specs)
 
     await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_injects_requirement_into_entry_step_prompt_only(tmp_path):
+    store = await make_store(tmp_path)
+    project = await store.create_project("demo4", str(tmp_path))
+    playbook = load_playbook(FIXTURE)
+    run = await store.create_run(project.id, FIXTURE, "demo run 4", requirement_text="Add a login page.")
+    await materialize(playbook, run.id, store)
+
+    script = {
+        "plan": FakeStepScript(artifact={"steps": ["a", "b"]}),
+        "implement": FakeStepScript(artifact={"diff": "..."}),
+        "review": FakeStepScript(artifact={"verdict": "ok"}),
+    }
+    driver = CapturingDriver(script)
+    orchestrator = Orchestrator(store, driver, playbook)
+
+    await orchestrator.run_to_completion(run.id)
+
+    entry_specs = [s for s in driver.captured_specs if s.step_id == "plan"]
+    downstream_specs = [s for s in driver.captured_specs if s.step_id != "plan"]
+    assert entry_specs and all("Add a login page." in s.prompt for s in entry_specs)
+    assert downstream_specs
+    assert not any("Add a login page." in s.prompt for s in downstream_specs)

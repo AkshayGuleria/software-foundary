@@ -484,7 +484,7 @@ class Orchestrator:
 
     async def _compose_context_bundle(
         self, run_id: str, task_unit: WorkUnit
-    ) -> tuple[list[str], list[Memory], int]:
+    ) -> tuple[list[str], list[Memory], int, bool]:
         # Which upstream artifacts feed INTO this dispatching unit: UnitDep rows
         # for static ("needs") steps point needs_unit_id directly at the upstream
         # *task* WorkUnit (see materializer.materialize), and _collect() always
@@ -512,7 +512,10 @@ class Orchestrator:
             memory_items = select_relevant_memory(candidates, query_text)
 
         bundle_chars = sum(len(f) for f in bundle_files) + sum(len(m.body_md) for m in memory_items)
-        return sorted(bundle_files), memory_items, bundle_chars
+        # is_entry_step reuses needed_ids computed above: an entry step is
+        # exactly one with no upstream deps.
+        is_entry_step = not needed_ids
+        return sorted(bundle_files), memory_items, bundle_chars, is_entry_step
 
     async def dispatch(self, run_id: str) -> int:
         units = await self.store.list_units(run_id)
@@ -568,7 +571,9 @@ class Orchestrator:
                     cwd = self.worktree_manager.create(self.project_path, run_id, task_unit.id)
                     self._unit_worktrees[task_unit.id] = cwd
 
-            bundle_files, memory_items, bundle_chars = await self._compose_context_bundle(run_id, task_unit)
+            bundle_files, memory_items, bundle_chars, is_entry_step = await self._compose_context_bundle(
+                run_id, task_unit
+            )
             await self.store.append_event(
                 run_id,
                 session_unit.id,
@@ -582,7 +587,17 @@ class Orchestrator:
 
             role_spec = self._roles_by_id.get(step.role)
             model = role_spec.model if role_spec is not None else "fake"
-            prompt = render_prompt(role_spec, step.id, step.produces, bundle_files, memory_items)
+            requirement_text = run.requirement_text if (is_entry_step and run is not None) else None
+            requirement_path = run.requirement_path if (is_entry_step and run is not None) else None
+            prompt = render_prompt(
+                role_spec,
+                step.id,
+                step.produces,
+                bundle_files,
+                memory_items,
+                requirement_text=requirement_text,
+                requirement_path=requirement_path,
+            )
 
             spec = SessionSpec(
                 cwd=cwd,

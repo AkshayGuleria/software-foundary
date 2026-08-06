@@ -16,8 +16,16 @@ def render_prompt(
     produces: str | None,
     input_files: list[str],
     memory_items: list[Memory],
+    requirement_text: str | None = None,
+    requirement_path: str | None = None,
 ) -> str:
     lines = [_role_header(role, "unknown"), f"\n# Step: {step_id}"]
+    if requirement_text or requirement_path:
+        lines.append("\n# Requirement")
+        if requirement_text:
+            lines.append(requirement_text)
+        if requirement_path:
+            lines.append(f"See `{requirement_path}` in the project repo for the full requirement.")
     if produces:
         lines.append(f"Produce an artifact of kind: {produces}")
     if input_files:
