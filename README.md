@@ -246,9 +246,10 @@ unresolved `human_task` step).
 
 **Dashboard:** register the target project on the **Projects** page (or set
 it as that project's `default_playbook_path` in its Settings), then on
-**Runs** submit the new playbook's path in the "Playbook path" field. The
-run's detail page drives approvals/rejections from there — nothing about the
-UI needs to know a new playbook exists ahead of time.
+**Runs** pick the new playbook from the "Playbook" dropdown. The run's
+detail page drives approvals/rejections from there — nothing about the UI
+needs to know a new playbook exists ahead of time beyond appearing in the
+picker (see below).
 
 ### 5. Test it
 
@@ -281,3 +282,13 @@ from the UI:
 Saved copies land at `project_playbooks/<project_id>/<slug>.toml` and are
 run-ready paths just like anything under `packs/` — point a run at one the
 same way you would any other playbook path.
+
+Neither starting a run nor setting a project's default playbook path
+requires typing a path by hand anymore: both use a shared dropdown picker
+(grouped into "Project playbooks" and "Pack templates", with a "New
+playbook →" link straight into the editor above), and an already-set custom
+path is still shown rather than silently dropped. The playbook editor page
+also has a collapsible, read-only field-reference panel listing every
+`PlaybookSpec`/`StepSpec`/`LoopSpec` attribute (type, default, required,
+description) straight from the real Pydantic schema, so it can't drift out
+of sync with what a playbook actually accepts.
