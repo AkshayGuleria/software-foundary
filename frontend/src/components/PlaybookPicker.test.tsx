@@ -93,4 +93,17 @@ describe("PlaybookPicker", () => {
     );
     expect(screen.getByRole("combobox")).toHaveValue("tests/orchestrator/fixtures/linear_demo.toml");
   });
+
+  it("allows clearing the value via the placeholder option when not required", async () => {
+    stubFetch();
+    const onChange = renderPicker({ value: "project_playbooks/proj-1/hotfix.toml" });
+
+    await waitFor(() => expect(screen.getByRole("option", { name: /hotfix/i })).toBeInTheDocument());
+    const placeholder = screen.getByRole("option", { name: /select a playbook/i });
+    expect(placeholder).not.toBeDisabled();
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByRole("combobox"), "");
+    expect(onChange).toHaveBeenCalledWith("");
+  });
 });

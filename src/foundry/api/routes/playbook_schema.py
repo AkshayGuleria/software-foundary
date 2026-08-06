@@ -22,7 +22,13 @@ class SchemaFieldDoc(BaseModel):
 
 
 def _format_type(field_info: FieldInfo) -> str:
-    return str(field_info.annotation).replace("typing.", "").replace("<class '", "").replace("'>", "")
+    return (
+        str(field_info.annotation)
+        .replace("typing.", "")
+        .replace("<class '", "")
+        .replace("'>", "")
+        .replace("foundry.playbook.schema.", "")
+    )
 
 
 def _field_docs(

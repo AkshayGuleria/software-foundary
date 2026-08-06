@@ -54,7 +54,7 @@ class StepSpec(BaseModel):
     )
     loop: LoopSpec | None = Field(
         default=None,
-        description="Loop configuration to re-run this step until until condition is met.",
+        description="Loop configuration to re-run this step until the loop's `until` condition is met.",
     )
     escalates_on: str | None = Field(
         default=None,

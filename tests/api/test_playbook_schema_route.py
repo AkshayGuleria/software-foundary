@@ -58,3 +58,15 @@ async def test_schema_help_resolves_default_factory_fields(api_client):
     needs_field = by_key[("StepSpec", "needs")]
     assert needs_field["required"] is False
     assert needs_field["default"] == "[]"
+
+
+@pytest.mark.asyncio
+async def test_schema_help_strips_internal_module_paths_from_nested_types(api_client):
+    client, _store, _scheduler = api_client
+    resp = await client.get("/api/playbooks/schema-help")
+    body = resp.json()["data"]
+    by_key = {(e["model"], e["field"]): e for e in body}
+
+    steps_field = by_key[("PlaybookSpec", "steps")]
+    assert "foundry.playbook.schema" not in steps_field["type"]
+    assert "StepSpec" in steps_field["type"]

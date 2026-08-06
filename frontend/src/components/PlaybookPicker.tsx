@@ -47,7 +47,7 @@ export default function PlaybookPicker({
         wrapClassName="flex-1"
         className="w-full"
       >
-        <option value="" disabled>
+        <option value="" disabled={required}>
           {projectId ? "Select a playbook…" : "Select a project first"}
         </option>
         {isCustom && <option value={value}>Custom: {value}</option>}
