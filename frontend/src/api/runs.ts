@@ -15,6 +15,8 @@ export async function createRun(input: {
   playbook_path: string;
   title?: string;
   driver?: string;
+  requirement_text?: string;
+  requirement_path?: string;
 }): Promise<Run> {
   const res = await apiFetch<Run>("/api/runs", {
     method: "POST",

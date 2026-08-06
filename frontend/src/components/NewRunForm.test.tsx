@@ -113,4 +113,31 @@ describe("NewRunForm", () => {
     expect(screen.getByLabelText(/driver/i)).toHaveValue("claude");
     expect(screen.getByLabelText(/playbook path/i)).toHaveValue("project_playbooks/p1/hotfix.toml");
   });
+
+  it("requirement text and requirement path fields are mutually exclusive", async () => {
+    stubFetch();
+    renderForm(vi.fn());
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/^requirement \(optional\)/i), "Add a login page.");
+    expect(screen.getByLabelText(/file path in the repo/i)).toBeDisabled();
+
+    await user.clear(screen.getByLabelText(/^requirement \(optional\)/i));
+    await user.type(screen.getByLabelText(/file path in the repo/i), "docs/REQUIREMENTS.md");
+    expect(screen.getByLabelText(/^requirement \(optional\)/i)).toBeDisabled();
+  });
+
+  it("submits requirement_text on the payload when set", async () => {
+    stubFetch();
+    const onSubmit = vi.fn();
+    renderForm(onSubmit);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/^requirement \(optional\)/i), "Add a login page.");
+    await user.click(screen.getByRole("button", { name: /start run/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ requirement_text: "Add a login page.", requirement_path: undefined }),
+    );
+  });
 });
