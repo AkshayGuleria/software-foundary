@@ -1,8 +1,0 @@
-[playbook]
-id = "unresolved"
-
-[[step]]
-id = "a"
-role = "nonexistent_role"
-produces = "x"
-gate = "none"
